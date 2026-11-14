@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="EnterSight — Perfil, progresso de uso e contribuição ao negócio." />
+  <title>EnterSight • Perfil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilo.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='acessibilidade/acessibilidade.css') }}" />
+        <!-- icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicons/apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicons/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicons/favicon-16x16.png') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicons/favicon.ico') }}">
+  <style>
+    .pf-page { display: flex; flex-direction: column; gap: 20px; }
+    .pf-header { margin-bottom: 4px; }
+    .pf-header .migalhas { font-size: 0.75rem; color: var(--suave); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; margin-bottom: 6px; }
+    .pf-header h1 { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 4px; color: var(--texto); }
+    .pf-header p { color: var(--suave); font-size: 0.9rem; margin: 0; }
+
+    .pf-hero {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 20px;
+      align-items: center;
+      padding: 24px;
+      background: var(--cartao);
+      border: 1px solid var(--borda);
+      border-radius: 16px;
+    }
+    .pf-avatar {
+      width: 72px; height: 72px; border-radius: 20px;
+      background: linear-gradient(135deg, #3B82F6, #2563EB);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-size: 1.35rem; font-weight: 800; letter-spacing: 0.04em;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
+      flex-shrink: 0;
+    }
+    .pf-hero-body h2 { margin: 0 0 4px; font-size: 1.35rem; font-weight: 800; color: var(--texto); }
+    .pf-hero-meta { display: flex; flex-wrap: wrap; gap: 10px 16px; color: var(--suave); font-size: 0.85rem; }
+    .pf-hero-meta span { display: inline-flex; align-items: center; gap: 6px; }
+    .pf-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .pf-hero-actions .botao { min-width: 0; }
+
+    .pf-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .pf-stat {
+      background: var(--cartao);
+      border: 1px solid var(--borda);
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+    .pf-stat__label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--suave); margin-bottom: 6px; }
+    .pf-stat__value { font-size: 1.45rem; font-weight: 800; color: var(--texto); line-height: 1.1; }
+
+    .pf-progress-card, .pf-contrib-card {
+      background: var(--cartao);
+      border: 1px solid var(--borda);
+      border-radius: 16px;
+      padding: 22px 24px;
+    }
+    .pf-card-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .pf-card-head h2 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 800; color: var(--texto); }
+    .pf-card-head p { margin: 0; font-size: 0.85rem; color: var(--suave); }
+    .pf-nivel {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+      background: rgba(59,130,246,0.1); color: var(--primaria); border: 1px solid rgba(59,130,246,0.2);
+      white-space: nowrap;
+    }
+
+    .pf-bar-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .pf-bar {
+      flex: 1; height: 12px; border-radius: 999px; background: var(--borda);
+      overflow: hidden; position: relative;
+    }
+    .pf-bar__fill {
+      height: 100%; width: 0; border-radius: 999px;
+      background: linear-gradient(90deg, #3B82F6, #10B981);
+      transition: width 0.9s cubic-bezier(.4,0,.2,1);
+    }
+    .pf-bar__pct { font-size: 0.95rem; font-weight: 800; color: var(--texto); min-width: 3.2rem; text-align: right; }
+    .pf-bar-caption { font-size: 0.82rem; color: var(--suave); margin-bottom: 18px; }
+
+    .pf-etapas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; list-style: none; padding: 0; margin: 0; }
+    .pf-etapa {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 12px; border-radius: 12px; border: 1px solid var(--borda); background: var(--fundo);
+    }
+    .pf-etapa.is-done { border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.06); }
+    .pf-etapa__icon {
+      width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+      background: rgba(59,130,246,0.12); color: var(--primaria);
+    }
+    .pf-etapa.is-done .pf-etapa__icon { background: rgba(16,185,129,0.16); color: #10B981; }
+    .pf-etapa__title { font-size: 0.86rem; font-weight: 700; color: var(--texto); margin: 0 0 2px; }
+    .pf-etapa__desc { font-size: 0.75rem; color: var(--suave); margin: 0; line-height: 1.4; }
+    .pf-etapa__cta { display: inline-block; margin-top: 6px; font-size: 0.75rem; font-weight: 700; color: var(--primaria); text-decoration: none; }
+    .pf-etapa__cta:hover { text-decoration: underline; }
+
+    .pf-next {
+      margin-top: 16px; padding: 14px 16px; border-radius: 12px;
+      border: 1px dashed rgba(59,130,246,0.35); background: rgba(59,130,246,0.06);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+    .pf-next strong { display: block; font-size: 0.88rem; color: var(--texto); margin-bottom: 2px; }
+    .pf-next span { font-size: 0.8rem; color: var(--suave); }
+
+    .pf-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .pf-narrativa, .pf-status {
+      font-size: 0.88rem; line-height: 1.65; color: var(--texto);
+    }
+    .pf-status { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; color: var(--suave); }
+    .pf-status-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; background: #9ca3af; }
+
+    .pf-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .pf-list-card { background: var(--cartao); border: 1px solid var(--borda); border-radius: 16px; padding: 20px; }
+    .pf-list-card h2 { margin: 0 0 4px; font-size: 1.02rem; font-weight: 800; }
+    .pf-list-card .cartao__subtitulo { margin: 0 0 14px; font-size: 0.82rem; color: var(--suave); }
+    .lista__item { background: var(--fundo); border: 1px solid var(--borda); }
+    .lista__empty { color: var(--suave); font-size: 0.86rem; line-height: 1.5; padding: 8px 2px; }
+
+    @media (max-width: 980px) {
+      .pf-hero { grid-template-columns: 1fr; }
+      .pf-hero-actions { justify-content: flex-start; }
+      .pf-stats, .pf-kpis, .pf-etapas, .pf-grid-2 { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 700px) and (max-width: 980px) {
+      .pf-stats, .pf-kpis { grid-template-columns: 1fr 1fr; }
+      .pf-etapas { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Ir para conteúdo</a>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" aria-label="Navegação principal">
+      {% include 'partials/navbar.html' %}
+    </aside>
+    <div class="main">
+      <header class="topbar" role="banner">
+        <div class="topbar__left">
+          <button class="topbar__btn topbar__mobile-toggle" onclick="abrirSidebar()" aria-label="Abrir menu"><i class="fa-solid fa-bars"></i></button>
+          <span class="topbar__greeting">Olá, <strong>{{ session.usuario_nome }}</strong></span>
+        </div>
+        <div class="topbar__actions">
+          <button class="topbar__btn" onclick="alternarTema()" aria-label="Alternar tema" id="btnTema"><i class="fa-solid fa-moon"></i></button>
+          <a class="topbar__btn" href="{{ url_for('pagina_configuracoes') }}" title="Configurações"><i class="fa-solid fa-gear"></i></a>
+        </div>
+      </header>
+
+      <main id="conteudo" class="pagina" role="main" data-ia-help="page_perfil">
+        <div class="container pf-page">
+
+          <header class="pf-header">
+            <div class="migalhas">Conta</div>
+            <h1>Seu perfil</h1>
+            <p>Uso da plataforma, impacto nos números do negócio e histórico recente.</p>
+          </header>
+
+          <section class="pf-hero" aria-label="Resumo do perfil" data-ia-help="perfil_resumo">
+            <div class="pf-avatar" aria-hidden="true">{{ uso.iniciais }}</div>
+            <div class="pf-hero-body">
+              <h2>{{ uso.nome }}</h2>
+              <div class="pf-hero-meta">
+                {% if uso.email %}
+                <span><i class="fa-regular fa-envelope"></i> {{ uso.email }}</span>
+                {% endif %}
+                {% if session.usuario_cnpj %}
+                <span><i class="fa-solid fa-id-card"></i> CNPJ: {{ session.usuario_cnpj }}</span>
+                {% endif %}
+                {% if is_mei %}
+                <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; padding: 2px 8px; border-radius: 6px;">
+                  <i class="fa-solid fa-bolt"></i> Plano Ativo: MEI
+                </span>
+                {% else %}
+                <span style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-weight: 700; padding: 2px 8px; border-radius: 6px;">
+                  <i class="fa-solid fa-building"></i> Plano Ativo: ME
+                </span>
+                {% endif %}
+                {% if uso.membro_desde %}
+                <span><i class="fa-regular fa-calendar"></i> Na plataforma desde {{ uso.membro_desde }}</span>
+                {% endif %}
+                <span><i class="fa-solid fa-layer-group"></i> Nível: {{ uso.nivel }}</span>
+              </div>
+            </div>
+            <div class="pf-hero-actions perfil-acoes">
+              <a href="{{ url_for('pagina_assinaturas') }}" class="botao botao--primario" id="btnAlternarPlano">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                Mudar de Plano
+              </a>
+              <button type="button" class="botao botao--outline" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" id="btnAbrirModalCancelarAssinatura">
+                <i class="fa-solid fa-ban"></i> Cancelar Assinatura
+              </button>
+              <a href="{{ url_for('logout') }}" class="botao botao--suave">
+                <i class="fa-solid fa-right-from-bracket"></i> Trocar conta
+              </a>
+            </div>
+          </section>
+
+          <section class="pf-stats" aria-label="Atividade na plataforma">
+            <article class="pf-stat">
+              <div class="pf-stat__label">Planilhas</div>
+              <div class="pf-stat__value">{{ uso.total_planilhas }}</div>
+            </article>
+            <article class="pf-stat">
+              <div class="pf-stat__label">Análises</div>
+              <div class="pf-stat__value">{{ uso.total_analises }}</div>
+            </article>
+            <article class="pf-stat">
+              <div class="pf-stat__label">Relatórios</div>
+              <div class="pf-stat__value">{{ uso.total_relatorios }}</div>
+            </article>
+          </section>
+
+          <section class="pf-progress-card" aria-labelledby="titulo-progresso" data-ia-help="perfil_progresso">
+            <div class="pf-card-head">
+              <div>
+                <h2 id="titulo-progresso">Progresso de uso da plataforma</h2>
+                <p>{{ uso.etapas_feitas }} de {{ uso.etapas_total }} etapas concluídas</p>
+              </div>
+              <span class="pf-nivel"><i class="fa-solid fa-gauge-high"></i> {{ uso.nivel }}</span>
+            </div>
+            <div class="pf-bar-wrap">
+              <div class="pf-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ uso.progresso }}" aria-label="Progresso de uso">
+                <div class="pf-bar__fill" id="pf-progress-fill" data-progresso="{{ uso.progresso }}"></div>
+              </div>
+              <div class="pf-bar__pct">{{ uso.progresso }}%</div>
+            </div>
+            <p class="pf-bar-caption">{{ uso.nivel_hint }}</p>
+
+            <ul class="pf-etapas">
+              {% for etapa in uso.etapas %}
+              <li class="pf-etapa {% if etapa.feito %}is-done{% endif %}">
+                <div class="pf-etapa__icon">
+                  <i class="fa-solid {% if etapa.feito %}fa-check{% else %}{{ etapa.icone }}{% endif %}"></i>
+                </div>
+                <div>
+                  <p class="pf-etapa__title">{{ etapa.titulo }}</p>
+                  <p class="pf-etapa__desc">{{ etapa.descricao }}</p>
+                  {% if not etapa.feito and etapa.endpoint %}
+                  <a class="pf-etapa__cta" href="{{ url_for(etapa.endpoint) }}">{{ etapa.cta_label }} →</a>
+                  {% endif %}
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+
+            {% if uso.proxima %}
+            <div class="pf-next">
+              <div>
+                <strong>Próximo passo: {{ uso.proxima.titulo }}</strong>
+                <span>{{ uso.proxima.descricao }}</span>
+              </div>
+              {% if uso.proxima.endpoint %}
+              <a class="botao botao--primario" href="{{ url_for(uso.proxima.endpoint) }}">
+                {{ uso.proxima.cta_label }}
+              </a>
+              {% endif %}
+            </div>
+            {% endif %}
+          </section>
+
+          {% include 'partials/footer.html' %}
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal Confirmar Cancelamento de Assinatura -->
+  <div id="modalCancelarAssinatura" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center;">
+    <div class="modal-card" style="background: var(--bg-card, #1e293b); color: white; padding: 24px; border-radius: 12px; max-width: 480px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <i class="fa-solid fa-triangle-exclamation" style="color: #ef4444; font-size: 1.5rem;"></i>
+        <h3 style="margin: 0; font-size: 1.25rem;">Cancelar Assinatura?</h3>
+      </div>
+      <p style="color: var(--texto-secundario, #94a3b8); font-size: 0.95rem; line-height: 1.5; margin-bottom: 20px;">
+        Tem certeza que deseja cancelar sua assinatura do EnterSight? Ao confirmar, as cobranças recorrentes serão interrompidas no Stripe e seu acesso ao painel será suspenso.
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button type="button" class="botao botao--suave" id="btnFecharModalCancelar">Voltar</button>
+        <button type="button" class="botao" style="background: #ef4444; color: #fff; font-weight: 600;" id="btnConfirmarCancelarAssinatura">
+          <i class="fa-solid fa-ban"></i> Confirmar Cancelamento
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {% include 'partials/navbar_mobile.html' %}
+  {% include 'partials/painel_acessibilidade.html' %}
+
+
+  <script>window.__PERFIL_USO = {{ uso | tojson }};</script>
+  <script src="{{ url_for('static', filename='acessibilidade/acessibilidade.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/perfil.js') }}"></script>
+  <script>
+    function abrirSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebarOverlay').classList.add('active');}
+    function fecharSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('active');}
+
+    function alternarPlanoUsuario() {
+      window.location.href = "{{ url_for('pagina_assinaturas') }}";
+    }
+  </script>
+</body>
+</html>

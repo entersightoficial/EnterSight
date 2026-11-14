@@ -1,0 +1,1320 @@
+// ==============================================================================
+// home.js
+// ==============================================================================
+// Este código pertence à plataforma @EnterSight.
+// Todos os códigos da plataforma devem seguir a mesma estrutura de organização
+// em seções numeradas, conforme este arquivo.
+// ==============================================================================
+
+// ==============================================================================
+// 1. CONFIGURAÇÕES E ESTADO GLOBAL
+// ==============================================================================
+
+const PERIODOS = {
+  '7_dias': 'Últimos 7 dias',
+  '30_dias': 'Últimos 30 dias',
+  '90_dias': 'Últimos 90 dias',
+  'ano_atual': 'Este ano'
+};
+
+let periodoAtual = '30_dias';
+let tabelaAtualId = 'todas';
+let chartLinha = null;
+let chartBarras = null;
+let chartProdutosVendas = null;
+let chartProdutosLucro = null;
+
+let listaMensagensIa = [];
+let indiceMensagemIaAtual = 0;
+let chartInstanciasIa = [];
+
+// ==============================================================================
+// 2. INICIALIZAÇÃO
+// ==============================================================================
+
+document.addEventListener('DOMContentLoaded', async () => {
+  configurarPeriodo();
+  await configurarSeletorPlanilhaHome();
+  inicializarModaisKpi();
+  atualizarTudo();
+  carregarStatus();
+  carregarInsight();
+  carregarUltimaRespostaIA();
+});
+
+// ==============================================================================
+// 3. CONTROLE DE PLANILHA / ORIGEM
+// ==============================================================================
+
+async function configurarSeletorPlanilhaHome() {
+  const select = document.getElementById('seletorPlanilhaHome');
+  if (!select) return;
+
+  try {
+    const resp = await fetch('/api/planilhas/sumario');
+    if (!resp.ok) return;
+    const json = await resp.json();
+    const planilhas = json.planilhas || [];
+
+    select.innerHTML = '';
+
+    const optTodas = document.createElement('option');
+    optTodas.value = 'todas';
+    optTodas.textContent = `🌐 Todas as Planilhas (Visão Consolidada - ${planilhas.length})`;
+    select.appendChild(optTodas);
+
+    planilhas.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      const icone = p.tipo_fluxo === 'saida' ? '🔻' : (p.tipo_fluxo === 'entrada' ? '🟢' : '📁');
+      opt.textContent = `${icone} [${p.dominio_label}] ${p.nome} (${p.total_linhas} linhas)`;
+      select.appendChild(opt);
+    });
+
+    const salva = localStorage.getItem('EnterSight_DashboardPlanilha');
+    if (salva && (salva === 'todas' || planilhas.some(p => p.id === salva))) {
+      select.value = salva;
+      tabelaAtualId = salva;
+    }
+
+    select.addEventListener('change', e => {
+      tabelaAtualId = e.target.value;
+      localStorage.setItem('EnterSight_DashboardPlanilha', tabelaAtualId);
+      atualizarTudo();
+      carregarStatus();
+      carregarInsight();
+    });
+
+    atualizarBadgeStatusHome(planilhas, tabelaAtualId);
+  } catch (e) {
+    console.warn('Aviso ao carregar planilhas na Home:', e);
+  }
+}
+
+function atualizarBadgeStatusHome(planilhas, idSelecionado) {
+  const container = document.getElementById('homeStatusFontesContainer');
+  if (!container) return;
+
+  if (idSelecionado === 'todas') {
+    container.innerHTML = `
+      <span class="badge" style="background:rgba(59,130,246,0.12); color:#3b82f6; border:1px solid rgba(59,130,246,0.25); padding:4px 10px; border-radius:14px; font-size:0.75rem; font-weight:600;">
+        <i class="fa-solid fa-layer-group"></i> ${planilhas.length} ${planilhas.length === 1 ? 'planilha consolidada' : 'planilhas consolidadas'}
+      </span>
+    `;
+  } else {
+    const p = planilhas.find(x => x.id === idSelecionado);
+    const nome = p ? p.nome : 'Planilha Individual';
+    const dom = p ? p.dominio_label : 'Individual';
+    container.innerHTML = `
+      <span class="badge" style="background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.25); padding:4px 10px; border-radius:14px; font-size:0.75rem; font-weight:600;">
+        <i class="fa-solid fa-file-invoice"></i> ${nome} (${dom})
+      </span>
+    `;
+  }
+}
+
+// ==============================================================================
+// 4. CONTROLE DE PERÍODO
+// ==============================================================================
+
+function configurarPeriodo() {
+  const select = document.getElementById('periodo');
+  if (!select) return;
+
+  select.value = periodoAtual;
+
+  select.addEventListener('change', e => {
+    const valor = e.target.value;
+    if (!PERIODOS[valor]) return console.error('Período inválido');
+
+    periodoAtual = valor;
+    atualizarTudo();
+    carregarStatus();
+    carregarInsight();
+  });
+}
+
+// ==============================================================================
+// 5. ATUALIZAÇÃO GERAL E FETCH GENÉRICO
+// ==============================================================================
+
+function atualizarTudo() {
+  carregarDados('/api/desempenho', atualizarIndicadores);
+  carregarDados('/api/graficos', atualizarGraficos);
+  carregarOverviewProdutos();
+}
+
+function carregarDados(url, callback) {
+  fetch(`${url}?periodo=${periodoAtual}&tabela_id=${tabelaAtualId}`)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      if (!data.erro) callback(data);
+    })
+    .catch(err => console.error(err));
+}
+
+// ==============================================================================
+// 6. INDICADORES (CARDS DE KPI)
+// ==============================================================================
+
+function atualizarIndicadores(data) {
+  atualizarCard('faturamento', data.faturamento);
+  atualizarCard('lucro', data.lucro);
+  atualizarCard('despesa', data.despesa, true);
+
+  if (data.crescimento && data.crescimento.valor !== null && data.crescimento.valor !== undefined) {
+    const val = Number(data.crescimento.valor);
+    const sinal = val >= 0 ? '+' : '';
+    setTexto('crescimento-valor', `${sinal}${val.toFixed(1)}%`);
+  } else {
+    setTexto('crescimento-valor', 'N/A', '#9ca3af');
+  }
+
+  // Feedback sobre mapeamento
+  if (!data.mapeamento_ativo) {
+    exibirAlertaMapeamento();
+  }
+}
+
+function exibirAlertaMapeamento() {
+  if (document.getElementById('alerta-mapeamento')) return;
+  const target = document.getElementById('container-alerta-home') || document.querySelector('.pagina__cabecalho');
+  if (!target) return;
+
+  const alerta = document.createElement('div');
+  alerta.id = 'alerta-mapeamento';
+  alerta.className = 'alerta-premium anim-fade-up';
+  alerta.style.width = '100%';
+  alerta.style.marginTop = '0';
+  alerta.style.marginBottom = '20px';
+  alerta.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <i class="fa-solid fa-circle-info"></i>
+      <span>O sistema está usando detecção automática. Para maior precisão, <strong>configure o mapeamento das suas colunas</strong>.</span>
+    </div>
+    <a href="/dados" class="alerta-premium__botao">Configurar Agora</a>
+  `;
+
+  if (target.id === 'container-alerta-home') {
+    target.appendChild(alerta);
+  } else {
+    target.insertAdjacentElement('afterend', alerta);
+  }
+}
+
+function atualizarCard(nome, dados, inverter = false) {
+  // Guarda de nulo antes de acessar propriedades.
+  if (!dados) {
+    setTexto(`${nome}-valor`, 'N/A', '#9ca3af');
+    setTexto(`${nome}-percent`, 'N/A', '#9ca3af');
+    return;
+  }
+
+  setTexto(`${nome}-valor`, formatarMoeda(dados.valor));
+
+  if (dados.percentual === null || dados.percentual === undefined) {
+    setTexto(`${nome}-percent`, 'N/A', '#9ca3af');
+    return;
+  }
+
+  const percentual = inverter ? Math.abs(dados.percentual) : dados.percentual;
+  const positivo = inverter ? dados.percentual <= 0 : dados.percentual >= 0;
+
+  const sinal = positivo ? '↑' : '↓';
+  const cor = positivo ? '#10b981' : '#ef4444';
+
+  setTexto(`${nome}-percent`, `${sinal} ${Number(percentual).toFixed(1)}%`, cor);
+}
+
+function setTexto(dataId, texto, cor = null) {
+  const el = document.querySelector(`[data-indicador="${dataId}"]`);
+  if (!el) return;
+
+  el.textContent = texto;
+  if (cor) el.style.color = cor;
+}
+
+// ==============================================================================
+// 7. AGUARDAR APEXCHARTS
+// ==============================================================================
+
+function aguardarApexCharts(callback, tentativas = 0) {
+  if (typeof ApexCharts !== 'undefined') {
+    callback();
+  } else if (tentativas < 30) {
+    setTimeout(() => aguardarApexCharts(callback, tentativas + 1), 100);
+  } else {
+    console.error('ApexCharts não carregou a tempo.');
+  }
+}
+
+// ==============================================================================
+// 8. GRÁFICOS PRINCIPAIS (LINHA E BARRAS)
+// ==============================================================================
+
+function atualizarGraficos(data) {
+  aguardarApexCharts(() => {
+    renderGraficoLinha(data.grafico_linha);
+    renderGraficoBarras(data.grafico_barras);
+  });
+}
+
+function renderGraficoLinha(dados) {
+  const container = document.getElementById('graficoLinhaFaturamento');
+  if (!container) return;
+
+  if (!dados?.labels?.length) return renderVazio(container, 350);
+
+  const corTexto = getCorTexto();
+
+  destruir(chartLinha);
+  container.innerHTML = '';
+
+  chartLinha = new ApexCharts(container, {
+    chart: { type: 'line', height: 350 },
+    series: dados.series,
+    xaxis: {
+      categories: dados.labels,
+      labels: {
+        style: { colors: corTexto },
+        formatter: function (value) {
+          // Exibir data em ISO (YYYY-MM-DD)
+          return value;
+        }
+      }
+    },
+    yaxis: {
+      labels: {
+        formatter: formatarMoeda,
+        style: { colors: corTexto }
+      }
+    },
+    tooltip: {
+      y: { formatter: formatarMoeda },
+      x: {
+        formatter: function (val) {
+          // Mostrar data ISO no tooltip
+          return `Data: ${val}`;
+        }
+      }
+    },
+    stroke: { curve: 'smooth' },
+    title: {
+      text: `Faturamento - ${PERIODOS[periodoAtual]}`,
+      align: 'center',
+      style: {
+        color: 'grey',
+        fontSize: '14px',
+        fontWeight: 'bold'
+      }
+    },
+    legend: {
+      labels: { colors: corTexto }
+    }
+  });
+
+  chartLinha.render();
+}
+
+function renderGraficoBarras(dados) {
+  const container = document.getElementById('graficoPizzaComparativa');
+  if (!container) return;
+
+  if (!dados?.labels?.length) return renderVazio(container, 400);
+
+  const corTexto = getCorTexto();
+
+  destruir(chartBarras);
+  container.innerHTML = '';
+
+  chartBarras = new ApexCharts(container, {
+    chart: {
+      type: 'bar',
+      height: 400
+    },
+    series: dados.series,
+    colors: ['#3b82f6', '#ef4444', '#10b981'],
+    xaxis: {
+      categories: dados.labels,
+      labels: { style: { colors: corTexto } }
+    },
+    yaxis: {
+      labels: {
+        formatter: formatarMoeda,
+        style: { colors: corTexto }
+      }
+    },
+    tooltip: {
+      y: { formatter: formatarMoeda }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    plotOptions: {
+      bar: {
+        borderRadius: 5,
+        columnWidth: '60%'
+      }
+    },
+    title: {
+      text: `Comparativo - ${PERIODOS[periodoAtual]}`,
+      align: 'center',
+      style: {
+        color: 'grey',
+        fontSize: '14px',
+        fontWeight: 'bold'
+      }
+    },
+    legend: {
+      labels: { colors: corTexto }
+    }
+  });
+
+  chartBarras.render();
+}
+
+// ==============================================================================
+// 9. STATUS DO NEGÓCIO
+// ==============================================================================
+
+function carregarStatus() {
+  fetch(`/api/status_negocio?periodo=${periodoAtual}&tabela_id=${tabelaAtualId}`)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      if (data.status && data.status !== 'erro') {
+        renderizarStatus(data);
+      } else {
+        renderizarStatusVazio();
+      }
+    })
+    .catch(err => {
+      console.error('Erro ao carregar status:', err);
+      renderizarStatusVazio();
+    });
+}
+
+function renderizarStatus(data) {
+  const container = document.getElementById('status-negocio-container');
+  const section = document.getElementById('status-negocio-section');
+
+  if (!container || !section) return;
+
+  // Definir cor da borda e fundo da seção
+  let corBorda = '#10b981';
+  if (data.status === 'estavel') corBorda = '#f59e0b';
+  else if (data.status === 'em_perigo') corBorda = '#ef4444';
+
+  section.style.borderLeftColor = corBorda;
+
+  const html = `
+    <p><strong>${data.emoji} ${data.status.charAt(0).toUpperCase() + data.status.slice(1).replace('_', ' ')}:</strong> ${data.descricao}</p>
+    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--borda); display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 13px;">
+
+    </div>
+  `;
+
+  // Bloco original comentado — mantido integralmente para referência:
+  // const html = `
+  //   <p><strong>${data.emoji} ${data.status.charAt(0).toUpperCase() + data.status.slice(1).replace('_', ' ')}:</strong> ${data.descricao}</p>
+  //   <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--borda); display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 13px;">
+  //     <div>
+  //       <strong>Faturamento:</strong><br/>
+  //       R$ ${formatarMoedaSimples(data.faturamento_valor)}<br/>
+  //       <span style="color: ${data.faturamento_percentual >= 0 ? '#10b981' : '#ef4444'};">
+  //         ${data.faturamento_percentual >= 0 ? '↑' : '↓'} ${Math.abs(data.faturamento_percentual).toFixed(1)}%
+  //       </span>
+  //     </div>
+  //     <div>
+  //       <strong>Lucro:</strong><br/>
+  //       R$ ${formatarMoedaSimples(data.lucro_valor)}<br/>
+  //       <span style="color: ${data.lucro_percentual >= 0 ? '#10b981' : '#ef4444'};">
+  //         ${data.lucro_percentual >= 0 ? '↑' : '↓'} ${Math.abs(data.lucro_percentual).toFixed(1)}%
+  //       </span>
+  //     </div>
+  //     <div>
+  //       <strong>Despesas:</strong><br/>
+  //       R$ ${formatarMoedaSimples(data.despesa_valor)}<br/>
+  //       <span style="font-size: 12px; color: var(--texto-secundario);">${PERIODOS[data.periodo]}</span>
+  //     </div>
+  //   </div>
+  // `;
+
+  container.innerHTML = html;
+}
+
+function renderizarStatusVazio() {
+  const container = document.getElementById('status-negocio-container');
+  const section = document.getElementById('status-negocio-section');
+
+  if (!container || !section) return;
+
+  section.style.borderLeftColor = '#9ca3af';
+  container.innerHTML = '<p style="color: var(--texto-secundario);">⚪ Sem dados: Carregue seus dados para análise automática do status.</p>';
+}
+
+// ==============================================================================
+// 10. INSIGHT DIÁRIO DA IA
+// ==============================================================================
+
+function carregarInsight() {
+  const containerInsights = document.getElementById('container-insights-ia');
+  if (!containerInsights) return;
+
+  // Mostrar skeleton de carregamento
+  containerInsights.innerHTML = `
+    <div class="p-3 rounded" style="background: var(--cartao); animation: pulse 2s infinite;">
+      <p class="p mb-0" style="color: var(--texto-secundario);"> A IA está analisando seus dados para gerar o insight do dia...</p>
+    </div>
+  `;
+
+  fetch(`/api/insight_diario?periodo=${periodoAtual}&tabela_id=${tabelaAtualId}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.html) {
+        // Remove asteriscos (*) do conteúdo
+        let htmlLimpo = data.html.replace(/\*/g, '');
+        containerInsights.innerHTML = htmlLimpo;
+      } else {
+        containerInsights.innerHTML = "<div class='p-3 rounded' style='background: var(--cartao);'><p class='p mb-0'>Não foi possível carregar os insights hoje.</p></div>";
+      }
+    })
+    .catch(error => {
+      console.error('Erro ao buscar insight:', error);
+      containerInsights.innerHTML = "<div class='p-3 rounded' style='background: var(--cartao);'><p class='p mb-0 text-danger'>Erro de conexão com a IA.</p></div>";
+    });
+}
+
+// ==============================================================================
+// 11. CONVERSÃO MARKDOWN E RENDERIZAÇÃO SEGURA
+// ==============================================================================
+
+function _converterTabelaMarkdownParaHtml(texto) {
+  const linhas = texto.replace(/\r\n/g, '\n').split('\n');
+  let html = '';
+  let buffer = [];
+  let i = 0;
+
+  const flushBuffer = () => {
+    if (!buffer.length) return;
+    const paragraph = buffer.join('\n').trim();
+    if (paragraph.length) {
+      html += `<p style="white-space: pre-wrap; margin: 0 0 12px;">${paragraph}</p>`;
+    }
+    buffer = [];
+  };
+
+  const isHeader = line => /^\s*\|.*\|.*$/.test(line);
+  const isSeparator = line => /^\s*\|?\s*[:\-\s]+\|.*$/.test(line);
+
+  while (i < linhas.length) {
+    const line = linhas[i];
+    const next = linhas[i + 1] || '';
+
+    if (isHeader(line) && isSeparator(next)) {
+      flushBuffer();
+      const header = line.replace(/^\||\|$/g, '').split('|').map(col => col.trim()).filter(col => col.length);
+      const rows = [];
+      i += 2;
+      while (i < linhas.length && /^\s*\|.*\|.*$/.test(linhas[i])) {
+        const row = linhas[i].replace(/^\||\|$/g, '').split('|').map(cell => cell.trim());
+        if (row.length) rows.push(row);
+        i += 1;
+      }
+
+      if (!header.length || !rows.length) {
+        html += `<pre style="white-space: pre-wrap; margin: 0 0 12px;">${line}</pre>`;
+        continue;
+      }
+
+      html += '<div style="overflow-x:auto; margin-bottom: 12px;"><table style="width:100%; border-collapse: collapse;">';
+      html += '<thead><tr>' + header.map(col => `<th style="border:1px solid var(--borda); padding:10px; text-align:left; background: rgba(59,130,246,0.06);">${col}</th>`).join('') + '</tr></thead>';
+      html += '<tbody>' + rows.map(row => `<tr>${row.map(cell => `<td style="border:1px solid var(--borda); padding:10px;">${cell}</td>`).join('')}</tr>`).join('') + '</tbody>';
+      html += '</table></div>';
+      continue;
+    }
+
+    buffer.push(line);
+    i += 1;
+  }
+
+  flushBuffer();
+  return html || texto;
+}
+
+function _renderizarHtmlSeguro(container, html) {
+  const marcador = document.createElement('div');
+  marcador.innerHTML = html;
+  const tagsPermitidas = [
+    'DIV', 'SPAN', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+    'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'UL', 'OL', 'LI',
+    'B', 'STRONG', 'I', 'EM', 'BR', 'HR', 'A', 'IMG', 'SECTION', 'ARTICLE',
+    'CODE', 'PRE', 'BLOCKQUOTE', 'SMALL', 'U', 'S'
+  ];
+  const scripts = marcador.querySelectorAll('script,iframe,object,embed');
+  scripts.forEach(el => el.remove());
+  for (const node of Array.from(marcador.querySelectorAll('*'))) {
+    if (!tagsPermitidas.includes(node.tagName)) {
+      node.replaceWith(document.createTextNode(node.innerText));
+      continue;
+    }
+    if (node.tagName === 'A') {
+      node.setAttribute('rel', 'nofollow noopener noreferrer');
+      node.setAttribute('target', '_blank');
+    }
+  }
+  container.innerHTML = '';
+  container.appendChild(marcador);
+}
+
+// ==============================================================================
+// 12. BANCO DE MENSAGENS DA IA (HOME) COM SUPORTE A GRÁFICOS APEXCHARTS
+// ==============================================================================
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function limparGraficosIaHome() {
+  if (chartInstanciasIa && chartInstanciasIa.length > 0) {
+    chartInstanciasIa.forEach(c => {
+      try {
+        if (c && typeof c.destroy === 'function') c.destroy();
+      } catch (e) {}
+    });
+    chartInstanciasIa = [];
+  }
+}
+
+function renderizarGraficosMensagemIa(container) {
+  if (!container) return;
+  const graficos = container.querySelectorAll('.grafico-ia-render:not(.renderizado)');
+  if (graficos.length === 0) return;
+
+  if (typeof ApexCharts === 'undefined') {
+    aguardarApexCharts(() => renderizarGraficosMensagemIa(container));
+    return;
+  }
+
+  const isDark = document.body.classList.contains('tema-escuro');
+  const txtColor = isDark ? '#94a3b8' : '#64748b';
+  const bgBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+  const bgCard = isDark ? 'rgba(15,23,42,0.6)' : 'rgba(248,250,252,0.95)';
+  const legendColor = isDark ? '#e2e8f0' : '#374151';
+  const themeMode = isDark ? 'dark' : 'light';
+
+  graficos.forEach((chartEl) => {
+    chartEl.classList.add('renderizado');
+    const periodo = chartEl.getAttribute('data-periodo') || '30_dias';
+    const tipoRaw = (chartEl.getAttribute('data-tipo') || 'linha').toLowerCase();
+    const metricasRaw = chartEl.getAttribute('data-metricas') || 'faturamento,lucro';
+    const titulo = chartEl.getAttribute('data-titulo') || 'Análise Visual da IA';
+    const metricasFiltro = metricasRaw.split(',').map(m => m.trim().toLowerCase());
+
+    let tipoChart = 'area';
+    if (tipoRaw === 'barras' || tipoRaw === 'barra' || tipoRaw === 'bar') tipoChart = 'bar';
+    if (tipoRaw === 'pizza' || tipoRaw === 'pie') tipoChart = 'pie';
+
+    chartEl.style.cssText = `min-height:280px; border:1px solid ${bgBorder}; border-radius:12px; padding:14px; margin:14px 0 10px 0; background:${bgCard}; position:relative; box-shadow:0 4px 16px rgba(0,0,0,0.05);`;
+    chartEl.innerHTML = `<div style="text-align:center; padding:35px 20px; color:var(--suave); font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px; color:var(--primaria);"></i> Carregando gráfico interativo da IA...</div>`;
+
+    fetch(`/api/graficos?periodo=${encodeURIComponent(periodo)}`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (!chartEl || !document.body.contains(chartEl)) return;
+        chartEl.innerHTML = '';
+        let options = null;
+
+        if (tipoChart === 'pie') {
+          const chartData = data.grafico_pizza;
+          if (!chartData || !chartData.labels || !chartData.series || chartData.series.length === 0) {
+            chartEl.innerHTML = '<p style="color:var(--suave);text-align:center;padding:24px;font-size:0.85rem;"><i class="fa-solid fa-circle-info" style="margin-right:6px;"></i>Sem dados suficientes para o gráfico neste período.</p>';
+            return;
+          }
+          const indices = [];
+          chartData.labels.forEach((lbl, i) => {
+            const nome = lbl.toLowerCase();
+            if (metricasFiltro.some(m => nome.includes(m) || m.includes(nome)) || metricasFiltro.includes('todos')) {
+              indices.push(i);
+            }
+          });
+          const series = indices.length > 0 ? indices.map(i => chartData.series[i]) : chartData.series;
+          const labels = indices.length > 0 ? indices.map(i => chartData.labels[i]) : chartData.labels;
+
+          options = {
+            chart: {
+              type: 'pie',
+              height: 270,
+              background: 'transparent',
+              foreColor: txtColor,
+              toolbar: { show: false }
+            },
+            title: {
+              text: titulo,
+              align: 'left',
+              style: { fontSize: '13px', fontWeight: 700, color: txtColor }
+            },
+            series: series,
+            labels: labels,
+            colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
+            legend: { show: true, position: 'bottom', labels: { colors: legendColor } },
+            dataLabels: { enabled: true, formatter: (val) => `${val.toFixed(1)}%` },
+            tooltip: {
+              y: {
+                formatter: (val) => 'R$ ' + Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              }
+            },
+            theme: { mode: themeMode }
+          };
+        } else {
+          const chartData = tipoChart === 'bar' ? data.grafico_barras : data.grafico_linha;
+          if (!chartData || !chartData.labels || !chartData.series) {
+            chartEl.innerHTML = '<p style="color:var(--suave);text-align:center;padding:24px;font-size:0.85rem;"><i class="fa-solid fa-circle-info" style="margin-right:6px;"></i>Sem dados suficientes para o gráfico neste período.</p>';
+            return;
+          }
+
+          let seriesFiltradas = chartData.series;
+          if (!metricasFiltro.includes('todos')) {
+            const filtradas = chartData.series.filter(s => {
+              const nome = (s.name || '').toLowerCase();
+              return metricasFiltro.some(m => nome.includes(m) || m.includes(nome));
+            });
+            if (filtradas.length > 0) seriesFiltradas = filtradas;
+          }
+
+          options = {
+            chart: {
+              type: tipoChart,
+              height: 270,
+              toolbar: { show: false },
+              background: 'transparent',
+              foreColor: txtColor
+            },
+            title: {
+              text: titulo,
+              align: 'left',
+              style: { fontSize: '13px', fontWeight: 700, color: txtColor }
+            },
+            series: seriesFiltradas,
+            xaxis: {
+              categories: chartData.labels,
+              labels: { style: { colors: txtColor, fontSize: '11px' } }
+            },
+            yaxis: {
+              labels: {
+                style: { colors: txtColor, fontSize: '11px' },
+                formatter: v => 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
+              }
+            },
+            legend: { show: true, position: 'top', horizontalAlign: 'right', labels: { colors: legendColor } },
+            colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
+            dataLabels: { enabled: false },
+            stroke: { curve: tipoChart === 'area' ? 'smooth' : 'straight', width: tipoChart === 'area' ? 2.5 : 0 },
+            fill: {
+              type: tipoChart === 'area' ? 'gradient' : 'solid',
+              gradient: { shadeIntensity: 0.1, opacityFrom: 0.35, opacityTo: 0.05 }
+            },
+            grid: { borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' },
+            tooltip: {
+              y: {
+                formatter: (val) => 'R$ ' + Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              }
+            },
+            theme: { mode: themeMode }
+          };
+        }
+
+        const chart = new ApexCharts(chartEl, options);
+        chart.render();
+        chartInstanciasIa.push(chart);
+      })
+      .catch(err => {
+        console.error('Erro ao renderizar gráfico no card da IA:', err);
+        chartEl.innerHTML = '<p style="color:#ef4444;text-align:center;padding:20px;font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>Erro ao carregar gráfico interativo.</p>';
+      });
+  });
+}
+
+function exibirMensagemIaPorIndice(indice) {
+  const container = document.getElementById('container-ultima-resposta-ia');
+  if (!container || !listaMensagensIa || listaMensagensIa.length === 0) return;
+
+  indiceMensagemIaAtual = Math.max(0, Math.min(indice, listaMensagensIa.length - 1));
+  const msg = listaMensagensIa[indiceMensagemIaAtual];
+
+  limparGraficosIaHome();
+
+  const controles = document.getElementById('controles-banco-ia');
+  const contador = document.getElementById('contador-mensagens-ia');
+  const btnAnt = document.getElementById('btn-msg-anterior');
+  const btnProx = document.getElementById('btn-msg-proxima');
+  const badgeGrafico = document.getElementById('badge-msg-grafico');
+
+  if (controles) controles.style.display = 'flex';
+  if (contador) contador.textContent = `${indiceMensagemIaAtual + 1} de ${listaMensagensIa.length}`;
+  if (btnAnt) btnAnt.disabled = (indiceMensagemIaAtual === 0);
+  if (btnProx) btnProx.disabled = (indiceMensagemIaAtual === listaMensagensIa.length - 1);
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'p-3 rounded';
+  wrapper.style.background = 'var(--cartao)';
+  wrapper.style.borderRadius = '12px';
+  container.innerHTML = '';
+  container.appendChild(wrapper);
+
+  // Pergunta original do usuário caso exista
+  if (msg.pergunta && msg.pergunta.trim()) {
+    const boxPergunta = document.createElement('div');
+    boxPergunta.style.cssText = 'font-size:0.82rem; background:rgba(59,130,246,0.08); border-left:3px solid var(--primaria); border-radius:6px; padding:8px 12px; margin-bottom:12px; color:var(--texto); display:flex; align-items:flex-start; gap:8px;';
+    boxPergunta.innerHTML = `<i class="fa-solid fa-circle-question" style="color:var(--primaria); margin-top:2px;"></i><div><strong>Pergunta:</strong> ${escapeHtml(msg.pergunta)}</div>`;
+    wrapper.appendChild(boxPergunta);
+  }
+
+  let texto = msg.resposta || '';
+
+  // Converte blocos de código markdown como ```chart ou ```grafico se houver
+  texto = texto.replace(/```(?:chart|grafico|apexchart)\s*([\s\S]*?)```/gi, (match, p1) => {
+    let tipo = 'linha', metricas = 'faturamento,lucro', periodo = '30_dias', tit = 'Gráfico da IA';
+    try {
+      const parsed = JSON.parse(p1);
+      tipo = parsed.type || parsed.tipo || tipo;
+      metricas = parsed.metrics || parsed.metricas || metricas;
+      periodo = parsed.period || parsed.periodo || periodo;
+      tit = parsed.title || parsed.titulo || tit;
+    } catch (e) {}
+    return `<div class="grafico-ia-render" data-periodo="${periodo}" data-tipo="${tipo}" data-metricas="${metricas}" data-titulo="${tit}"></div>`;
+  });
+
+  // Se o backend indicou gráfico associado via galeria e não há container de gráfico no HTML
+  if (msg.grafico_info && !texto.includes('grafico-ia-render')) {
+    const gi = msg.grafico_info;
+    texto += `\n\n<div class="grafico-ia-render" data-periodo="${gi.periodo || '30_dias'}" data-tipo="${gi.tipo || 'linha'}" data-metricas="${gi.metricas || 'faturamento,lucro'}" data-titulo="${gi.titulo || 'Análise Visual da IA'}"></div>`;
+  }
+
+  const contemHtml = /<\/?(div|table|thead|tbody|tr|td|th|ul|ol|li|p|img|svg|h[1-6]|strong|em|b|i|code|pre|blockquote|section|article)[\s>]/i.test(texto);
+  const contemTabelaMarkdown = /\n\s*\|.+\|\s*\n\s*\|?\s*[:-]+\s*\|/.test(texto);
+
+  let htmlConteudo = texto;
+  if (contemTabelaMarkdown) {
+    htmlConteudo = _converterTabelaMarkdownParaHtml(htmlConteudo);
+  }
+
+  const corpoMsg = document.createElement('div');
+  corpoMsg.style.lineHeight = '1.6';
+  corpoMsg.style.color = 'var(--texto)';
+  if (contemHtml || contemTabelaMarkdown) {
+    _renderizarHtmlSeguro(corpoMsg, htmlConteudo);
+  } else {
+    corpoMsg.innerHTML = `<div style="white-space: pre-wrap; font-family: inherit;">${texto}</div>`;
+  }
+  wrapper.appendChild(corpoMsg);
+
+  // Renderiza gráficos que existam no conteúdo
+  const temGraficosNoCorpo = wrapper.querySelectorAll('.grafico-ia-render').length > 0;
+  if (temGraficosNoCorpo) {
+    if (badgeGrafico) badgeGrafico.style.display = 'inline-flex';
+    renderizarGraficosMensagemIa(wrapper);
+  } else {
+    if (badgeGrafico) badgeGrafico.style.display = 'none';
+
+    // Botão para gerar gráfico sob demanda
+    const btnBox = document.createElement('div');
+    btnBox.style.cssText = 'margin-top:14px; display:flex; align-items:center; gap:8px;';
+    btnBox.innerHTML = `
+      <button type="button" class="botao botao--suave" style="font-size:0.75rem; padding:6px 14px; display:inline-flex; align-items:center; gap:6px; border-radius:8px;" title="Plotar gráfico das métricas desta resposta">
+        <i class="fa-solid fa-chart-area" style="color:var(--primaria);"></i> Visualizar Métricas em Gráfico
+      </button>
+    `;
+    const btnGerar = btnBox.querySelector('button');
+    btnGerar.addEventListener('click', () => {
+      btnBox.remove();
+      const divGrafico = document.createElement('div');
+      divGrafico.className = 'grafico-ia-render';
+      divGrafico.setAttribute('data-periodo', '30_dias');
+      divGrafico.setAttribute('data-tipo', 'area');
+      divGrafico.setAttribute('data-metricas', 'faturamento,lucro,despesas');
+      divGrafico.setAttribute('data-titulo', 'Evolução e Métricas Financeiras');
+      wrapper.appendChild(divGrafico);
+      if (badgeGrafico) badgeGrafico.style.display = 'inline-flex';
+      renderizarGraficosMensagemIa(wrapper);
+    });
+    wrapper.appendChild(btnBox);
+  }
+
+  // Rodapé da mensagem: data e ações
+  const footerMsg = document.createElement('div');
+  footerMsg.style.cssText = 'font-size:0.75rem; color:var(--suave); margin-top:14px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--borda); padding-top:8px;';
+
+  const sessaoLabel = msg.sessao_id ? `Sessão: ${msg.sessao_id.slice(0, 8)}...` : 'Chat IA';
+  footerMsg.innerHTML = `
+    <span><i class="fa-solid fa-layer-group" style="margin-right:4px;"></i>${sessaoLabel}</span>
+    ${msg.data ? `<span><i class="fa-regular fa-clock" style="margin-right:4px;"></i>${msg.data}</span>` : ''}
+  `;
+  wrapper.appendChild(footerMsg);
+}
+
+function carregarUltimaRespostaIA() {
+  const container = document.getElementById('container-ultima-resposta-ia');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="p-3 rounded" style="background: var(--cartao); animation: pulse 2s infinite;">
+      <p class="p mb-0" style="color: var(--texto-secundario);"><i class="fa-solid fa-spinner fa-spin" style="margin-right:6px;"></i>Buscando mensagens e gráficos no banco da IA...</p>
+    </div>
+  `;
+
+  fetch('/api/chatbot/ultima-resposta')
+    .then(response => {
+      if (!response.ok) return response.text().then(t => { throw new Error(`HTTP ${response.status}: ${t.slice(0, 200)}`); });
+      const ct = response.headers.get('content-type') || '';
+      if (ct.includes('application/json')) return response.json();
+      return response.text().then(t => ({ _rawText: t }));
+    })
+    .then(data => {
+      if (data && data._rawText) {
+        container.innerHTML = `<div class='p-3 rounded' style='background: var(--cartao);'><p class='p mb-0 text-danger'>Resposta inválida (esperado JSON). Atualize a página e verifique a sessão.</p></div>`;
+        console.error('Resposta bruta da API /api/chatbot/ultima-resposta:', data._rawText);
+        return;
+      }
+
+      if (data && data.mensagens && data.mensagens.length > 0) {
+        listaMensagensIa = data.mensagens;
+        exibirMensagemIaPorIndice(0);
+      } else if (data && data.resposta) {
+        listaMensagensIa = [{
+          resposta: data.resposta,
+          data: data.data,
+          sessao_id: data.sessao_id,
+          pergunta: '',
+          tem_grafico: false,
+          grafico_info: null
+        }];
+        exibirMensagemIaPorIndice(0);
+      } else {
+        container.innerHTML = "<div class='p-3 rounded' style='background: var(--cartao);'><p class='p mb-0' style='color:var(--texto-secundario);'>Nenhuma resposta da IA encontrada ainda no banco de dados.</p></div>";
+      }
+    })
+    .catch(error => {
+      console.error('Erro ao buscar mensagens do banco da IA:', error);
+      const msg = (error && error.message) ? error.message : 'Erro desconhecido';
+      container.innerHTML = `<div class='p-3 rounded' style='background: var(--cartao);'><p class='p mb-0 text-danger'>Falha ao buscar mensagens da IA: ${msg}</p></div>`;
+    });
+}
+
+// Configuração dos botões de navegação
+document.addEventListener('DOMContentLoaded', () => {
+  const btnAnt = document.getElementById('btn-msg-anterior');
+  const btnProx = document.getElementById('btn-msg-proxima');
+  if (btnAnt) {
+    btnAnt.addEventListener('click', () => {
+      if (indiceMensagemIaAtual > 0) {
+        exibirMensagemIaPorIndice(indiceMensagemIaAtual - 1);
+      }
+    });
+  }
+  if (btnProx) {
+    btnProx.addEventListener('click', () => {
+      if (indiceMensagemIaAtual < listaMensagensIa.length - 1) {
+        exibirMensagemIaPorIndice(indiceMensagemIaAtual + 1);
+      }
+    });
+  }
+});
+
+window.carregarUltimaRespostaIA = carregarUltimaRespostaIA;
+window.addEventListener('chatbot:nova-resposta', () => {
+  carregarUltimaRespostaIA();
+});
+
+// ==============================================================================
+// 13. OVERVIEW DE PRODUTOS
+// ==============================================================================
+
+function carregarOverviewProdutos() {
+  const loading = document.getElementById('produtos-overview-loading');
+  const overview = document.getElementById('produtos-overview');
+  const meta = document.getElementById('produtos-overview-meta');
+  const maisVendido = document.getElementById('produto-mais-vendido');
+  const menosVendido = document.getElementById('produto-menos-vendido');
+  const maiorLucro = document.getElementById('produto-maior-lucro');
+  const maiorDespesa = document.getElementById('produto-maior-despesa');
+  const menorDespesa = document.getElementById('produto-menos-despesa');
+  const estoqueCritico = document.getElementById('produto-estoque');
+  const tabelaBody = document.getElementById('tabela-produtos-body');
+
+  if (!loading || !overview) return;
+
+  loading.style.display = 'grid';
+  overview.style.display = 'none';
+
+  fetch(`/api/produtos/overview?periodo=${periodoAtual}`)
+    .then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    })
+    .then(data => {
+      loading.style.display = 'none';
+      overview.style.display = 'block';
+
+      const textoItem = item => {
+        if (!item) return '<span style="color: var(--texto-secundario);">Não disponível</span>';
+        const vendas = item.quantidade !== undefined ? formatarNumero(item.quantidade) : '—';
+        const lucro = item.lucro !== undefined ? formatarMoeda(item.lucro) : '—';
+        const despesa = item.despesa !== undefined ? formatarMoeda(item.despesa) : '—';
+        const estoque = item.estoque !== undefined && item.estoque !== null ? formatarNumero(item.estoque) : '—';
+        return `
+          <div class="produto-card__info">
+            <strong style="color:var(--texto);">${item.nome}</strong>
+            <div class="produto-card__stats">
+              <div class="produto-card__stat produto-card__stat--vendas"><span>Vendas</span>${vendas}</div>
+              <div class="produto-card__stat produto-card__stat--lucro"><span>Lucro</span>${lucro}</div>
+              <div class="produto-card__stat produto-card__stat--despesa"><span>Despesa</span>${despesa}</div>
+              <div class="produto-card__stat produto-card__stat--estoque"><span>Estoque</span>${estoque}</div>
+            </div>
+          </div>
+        `;
+      };
+
+      maisVendido.innerHTML = textoItem(data.mais_vendido);
+      menosVendido.innerHTML = textoItem(data.menos_vendido);
+      maiorLucro.innerHTML = textoItem(data.maior_lucro);
+      maiorDespesa.innerHTML = textoItem(data.maior_despesa);
+      menorDespesa.innerHTML = textoItem(data.menor_despesa);
+      estoqueCritico.innerHTML = data.tem_estoque ? textoItem(data.menos_estoque) : '<span style="color: var(--texto-secundario);">Sem dados de estoque</span>';
+      if (meta) {
+        meta.textContent = `Exibindo ${data.tabela_produtos.length} produtos · coluna de produto: ${data.produto_coluna || 'não detectada'}`;
+      }
+
+      if (tabelaBody) {
+        if (data.tabela_produtos && data.tabela_produtos.length) {
+          tabelaBody.innerHTML = data.tabela_produtos.map(item => `
+            <tr>
+              <td style="padding:10px 12px; border-bottom:1px solid var(--border-color);">${item.nome}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid var(--border-color); text-align:right;">${formatarMoeda(item.faturamento)}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid var(--border-color); text-align:right;">${formatarMoeda(item.despesa)}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid var(--border-color); text-align:right;">${formatarMoeda(item.lucro)}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid var(--border-color); text-align:right;">${formatarNumero(item.quantidade)}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid var(--border-color); text-align:right;">${item.estoque !== null && item.estoque !== undefined ? formatarNumero(item.estoque) : '—'}</td>
+            </tr>
+          `).join('');
+        } else {
+          tabelaBody.innerHTML = '<tr><td colspan="6" style="padding:18px; text-align:center; color:var(--texto-secundario);">Nenhum produto encontrado para exibir.</td></tr>';
+        }
+      }
+
+      renderGraficoProdutos('graficoProdutosVendas', data.grafico_vendas, 'Quantidade vendida', '#3b82f6');
+      renderGraficoProdutos('graficoProdutosLucro', data.grafico_lucro, 'Lucro', '#10b981');
+    })
+    .catch(error => {
+      console.error('Erro ao carregar overview de produtos:', error);
+      loading.style.display = 'none';
+      overview.style.display = 'block';
+      if (tabelaBody) {
+        tabelaBody.innerHTML = '<tr><td colspan="6" style="padding:18px; text-align:center; color:var(--texto-secundario);">Erro ao carregar produtos.</td></tr>';
+      }
+    });
+}
+
+function renderGraficoProdutos(elementId, dados, titulo, cor) {
+  aguardarApexCharts(() => {
+    const container = document.getElementById(elementId);
+    if (!container) return;
+
+    if (!dados?.labels?.length) {
+      container.innerHTML = `<div style="padding:28px; color: var(--texto-secundario); text-align:center;">Sem dados suficientes para ${titulo.toLowerCase()}.</div>`;
+      return;
+    }
+
+    const isQuantidade = elementId === 'graficoProdutosVendas';
+    if (isQuantidade) destruir(chartProdutosVendas);
+    if (elementId === 'graficoProdutosLucro') destruir(chartProdutosLucro);
+    container.innerHTML = '';
+
+    const formatterY = isQuantidade ? formatarNumero : formatarMoeda;
+    const tooltipFormatter = isQuantidade
+      ? (value) => formatarNumero(value)
+      : (value) => formatarMoeda(value);
+
+    const options = {
+      chart: { type: 'bar', height: 280, background: 'transparent' },
+      series: [{ name: titulo, data: dados.series }],
+      colors: [cor],
+      plotOptions: { bar: { borderRadius: 8, horizontal: false, columnWidth: '55%' } },
+      xaxis: { categories: dados.labels, labels: { style: { colors: getCorTexto() } } },
+      yaxis: { labels: { style: { colors: getCorTexto() }, formatter: formatterY } },
+      dataLabels: { enabled: false },
+      tooltip: { y: { formatter: tooltipFormatter }, theme: document.body.classList.contains('tema-escuro') ? 'dark' : 'light' },
+      title: { text: titulo, align: 'center', style: { color: getCorTexto(), fontSize: '13px', fontWeight: '600' } },
+      grid: { borderColor: 'rgba(148,163,184,0.15)' },
+      legend: { show: false },
+      theme: { mode: document.body.classList.contains('tema-escuro') ? 'dark' : 'light' }
+    };
+
+    const chart = new ApexCharts(container, options);
+    chart.render();
+
+    if (isQuantidade) chartProdutosVendas = chart;
+    if (elementId === 'graficoProdutosLucro') chartProdutosLucro = chart;
+  });
+}
+
+// ==============================================================================
+// 14. MODAIS DE DETALHE DE KPI
+// ==============================================================================
+
+// Inicializa os modais de KPI (cliques e teclado).
+// Originalmente esta função se chamava `renderizarStatusVazio`, o que causava
+// colisão de nome com a função de estado vazio acima; renomeada para refletir
+// sua responsabilidade real.
+function inicializarModaisKpi() {
+  const cards = document.querySelectorAll('[data-kpi]');
+  const modalBackdrop = document.getElementById('kpiDetalheModal');
+
+  if (!cards.length || !modalBackdrop) return;
+
+  cards.forEach(card => {
+    card.addEventListener('click', () => abrirModalDetalhe(card.dataset.kpi));
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        abrirModalDetalhe(card.dataset.kpi);
+      }
+    });
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      fecharModalDetalhe();
+    }
+  });
+
+  modalBackdrop.addEventListener('click', event => {
+    if (event.target === modalBackdrop) {
+      fecharModalDetalhe();
+    }
+  });
+}
+
+async function abrirModalDetalhe(kpi) {
+  const body = document.getElementById('kpiDetalheBody');
+  const title = document.getElementById('kpiDetalheTitulo');
+  const modal = document.getElementById('kpiDetalheModal');
+
+  if (!body || !title || !modal) return;
+
+  // Mapear títulos legíveis para cada tipo de KPI
+  const tituloMap = {
+    despesa: 'Despesas',
+    lucro: 'Lucro',
+    faturamento: 'Faturamento',
+    crescimento: 'Crescimento'
+  };
+
+  title.textContent = `Detalhes de ${tituloMap[kpi] || 'KPI'}`;
+  modal.style.display = 'flex';
+  modal.setAttribute('aria-hidden', 'false');
+  body.innerHTML = '<p>Carregando detalhes...</p>';
+
+  try {
+    const resposta = await fetch(`/api/desempenho/detalhe?kpi=${encodeURIComponent(kpi)}&periodo=${periodoAtual}&tabela_id=${tabelaAtualId}`);
+    if (!resposta.ok) {
+      throw new Error(`HTTP ${resposta.status}`);
+    }
+
+    const dados = await resposta.json();
+    if (dados.erro) {
+      throw new Error(dados.mensagem || 'Erro ao carregar detalhes');
+    }
+
+    renderizarDetalhesKpi(dados, kpi);
+  } catch (erro) {
+    console.error('Erro ao carregar detalhes do KPI:', erro);
+    body.innerHTML = `<p style="color:#ef4444;">Não foi possível carregar o detalhamento. ${erro.message}</p>`;
+  }
+}
+
+function fecharModalDetalhe() {
+  const modal = document.getElementById('kpiDetalheModal');
+  if (!modal) return;
+  modal.style.display = 'none';
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function renderizarDetalhesKpi(dados, kpi) {
+  const body = document.getElementById('kpiDetalheBody');
+  if (!body) return;
+
+  if (!dados.detalhes || !dados.detalhes.length) {
+    body.innerHTML = '<p>Não há detalhes disponíveis para este KPI no período selecionado.</p>';
+    return;
+  }
+
+  const temQuantidade = dados.quantidade_total !== null && dados.quantidade_total !== undefined;
+  const labelHeader = dados.label_coluna ? dados.label_coluna : 'Categoria / Item';
+  const totalQuantidadeTexto = temQuantidade
+    ? `Quantidade total: <strong>${formatarNumero(dados.quantidade_total)}</strong> ${dados.unidade_quantidade ? `(${dados.unidade_quantidade})` : ''}`
+    : '';
+
+  const topValor = dados.top_valor
+    ? `<div style="margin-bottom:12px; padding:14px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; color:var(--text-primary);">
+         <strong>Maior ${kpi === 'despesa' ? 'gasto' : kpi === 'lucro' ? 'lucro' : 'faturamento'}</strong><br/>
+         ${dados.top_valor.nome} • ${formatarMoeda(dados.top_valor.valor)}${temQuantidade ? ` • ${formatarNumero(dados.top_valor.quantidade)} ${dados.unidade_quantidade ? dados.unidade_quantidade : ''}` : ''}
+       </div>`
+    : '';
+
+  const bottomValor = dados.bottom_valor
+    ? `<div style="margin-bottom:16px; padding:14px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; color:var(--text-primary);">
+         <strong>Menor ${kpi === 'despesa' ? 'gasto' : kpi === 'lucro' ? 'lucro' : 'faturamento'}</strong><br/>
+         ${dados.bottom_valor.nome} • ${formatarMoeda(dados.bottom_valor.valor)}${temQuantidade ? ` • ${formatarNumero(dados.bottom_valor.quantidade)} ${dados.unidade_quantidade ? dados.unidade_quantidade : ''}` : ''}
+       </div>`
+    : '';
+
+  const topQuantidade = dados.top_quantidade
+    ? `<div style="margin-bottom:16px; padding:14px; background:#064e3b; border:1px solid #165f46; border-radius:12px; color:#ecfdf5;">
+         <strong>Mais vendido</strong><br/>
+         ${dados.top_quantidade.nome} • ${formatarNumero(dados.top_quantidade.quantidade)} ${dados.unidade_quantidade ? dados.unidade_quantidade : ''}
+       </div>`
+    : '';
+
+  const bottomQuantidade = dados.bottom_quantidade
+    ? `<div style="margin-bottom:16px; padding:14px; background:#7f1d1d; border:1px solid #991b1b; border-radius:12px; color:#f8fafc;">
+         <strong>Menos vendido</strong><br/>
+         ${dados.bottom_quantidade.nome} • ${formatarNumero(dados.bottom_quantidade.quantidade)} ${dados.unidade_quantidade ? dados.unidade_quantidade : ''}
+       </div>`
+    : '';
+
+  const linhas = dados.detalhes.map(item => {
+    return `
+      <tr>
+        <td style="padding:10px 12px; border-bottom:1px solid var(--border-color);">${item.nome}</td>
+        <td style="padding:10px 12px; border-bottom:1px solid var(--border-color); text-align:right;">R$ ${formatarMoeda(item.valor)}</td>
+        ${temQuantidade ? `<td style="padding:10px 12px; border-bottom:1px solid var(--border-color); text-align:right;">${formatarNumero(item.quantidade)}</td>` : ''}
+        <td style="padding:10px 12px; border-bottom:1px solid var(--border-color); text-align:right;">${item.porcentagem !== undefined ? formatarNumero(item.porcentagem) + '%' : '—'}</td>
+      </tr>
+    `;
+  }).join('');
+
+  body.innerHTML = `
+    <div style="margin-bottom:16px; font-size:0.95rem; color:var(--text-secondary);">
+      Total do período: <strong>R$ ${formatarMoeda(dados.valor_total)}</strong>
+      ${temQuantidade ? `<br/>${totalQuantidadeTexto}` : ''}
+    </div>
+    ${topValor}
+    ${bottomValor}
+    ${topQuantidade}
+    ${bottomQuantidade}
+    <div style="overflow:auto; max-height:330px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:14px; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.04);">
+      <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding:10px 12px; border-bottom:2px solid var(--border-color); color:var(--text-primary);">${labelHeader}</th>
+            <th style="text-align:right; padding:10px 12px; border-bottom:2px solid var(--border-color); color:var(--text-primary);">Valor</th>
+            ${temQuantidade ? `<th style="text-align:right; padding:10px 12px; border-bottom:2px solid var(--border-color); color:var(--text-primary);">Quantidade</th>` : ''}
+            <th style="text-align:right; padding:10px 12px; border-bottom:2px solid var(--border-color); color:var(--text-primary);">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${linhas}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ==============================================================================
+// 15. UTILIDADES DE TEMA E FORMATAÇÃO
+// ==============================================================================
+
+function getCorTexto() {
+  const isDark = document.body.classList.contains('tema-escuro');
+  if (isDark) return '#cbd5e1';
+  const val = getComputedStyle(document.documentElement).getPropertyValue('--texto').trim();
+  return val || '#111827';
+}
+
+function destruir(chart) {
+  if (chart) chart.destroy();
+}
+
+function renderVazio(container, altura) {
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;height:${altura}px;color:#9ca3af;">
+      Sem dados para ${PERIODOS[periodoAtual]}
+    </div>
+  `;
+}
+
+function formatarMoeda(valor) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(valor);
+}
+
+function formatarMoedaSimples(valor) {
+  if (valor >= 1e6) return `R$ ${(valor / 1e6).toFixed(1)}M`;
+  if (valor >= 1e3) return `R$ ${(valor / 1e3).toFixed(1)}K`;
+  return `R$ ${valor.toFixed(0)}`;
+}
+
+function formatarNumero(valor) {
+  return Number(valor).toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+}
+
+// ==============================================================================
+// 16. ENGINE DE ANÁLISE COMPLETA COM IA (DELEGADO AO IA_ANALISE_MODAL.JS)
+// ==============================================================================
+
+function abrirModalIaAnaliseHome() {
+  if (window.IaAnaliseModal) {
+    IaAnaliseModal.abrir('home', coletarContextoIaHome);
+  }
+}
+
+function fecharModalIaAnaliseHome() {
+  if (window.IaAnaliseModal) {
+    IaAnaliseModal.fechar('home');
+  }
+}
+
+function fecharModalIaAnaliseHomeSeBackdrop(event) {
+  if (window.IaAnaliseModal) {
+    IaAnaliseModal.fecharSeBackdrop(event, 'home');
+  }
+}
+
+function copiarAnaliseIaHome() {
+  if (window.IaAnaliseModal) {
+    IaAnaliseModal.copiar('home');
+  }
+}
+
+function executarSimulacaoIaHome() {
+  if (window.IaAnaliseModal) {
+    IaAnaliseModal.reanalisar('home');
+  }
+}
+
+// Exportar para escopo global
+window.abrirModalIaAnaliseHome = abrirModalIaAnaliseHome;
+window.fecharModalIaAnaliseHome = fecharModalIaAnaliseHome;
+window.fecharModalIaAnaliseHomeSeBackdrop = fecharModalIaAnaliseHomeSeBackdrop;
+window.executarSimulacaoIaHome = executarSimulacaoIaHome;
+window.copiarAnaliseIaHome = copiarAnaliseIaHome;

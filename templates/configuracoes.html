@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EnterSight • Configurações</title>
+  <meta name="description"
+    content="Gerencie preferências de acessibilidade, tema e aparência da plataforma EnterSight.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilo.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='acessibilidade/acessibilidade.css') }}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+      <!-- icon -->
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicons/apple-touch-icon.png') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicons/favicon-32x32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicons/favicon-16x16.png') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicons/favicon.ico') }}">
+  <style>
+    /* ── Configurações: estilos da página ── */
+    .cfg-page-header {
+      margin-bottom: 28px;
+    }
+
+    .cfg-page-header .migalhas {
+      font-size: 0.75rem;
+      color: var(--suave);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 600;
+    }
+
+    .cfg-page-header h1 {
+      font-size: 1.65rem;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      margin: 0 0 6px;
+    }
+
+    .cfg-page-header p {
+      color: var(--suave);
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    /* ── Card padrão das configurações ── */
+    .cfg-card {
+      background: var(--cartao, #111827);
+      border: 1px solid var(--borda, rgba(255, 255, 255, 0.07));
+      border-radius: 20px;
+      padding: 0;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+      margin-bottom: 20px;
+      transition: box-shadow 0.3s;
+    }
+
+    .cfg-card:hover {
+      box-shadow: 0 8px 36px rgba(59, 130, 246, 0.1);
+    }
+
+    .cfg-card-header {
+      padding: 20px 24px 18px;
+      border-bottom: 1px solid var(--borda, rgba(255, 255, 255, 0.07));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .cfg-card-header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .cfg-card-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+      flex-shrink: 0;
+    }
+
+    .cfg-card-icon.azul {
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(99, 102, 241, 0.15));
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .cfg-card-icon.roxo {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.15));
+      color: #c084fc;
+      border: 1px solid rgba(139, 92, 246, 0.2);
+    }
+
+    .cfg-card-icon.verde {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.15));
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .cfg-card-icon.laranja {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(234, 88, 12, 0.15));
+      color: #fb923c;
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .cfg-card-title-wrap h2 {
+      font-size: 1rem;
+      font-weight: 800;
+      margin: 0 0 3px;
+      letter-spacing: -0.01em;
+    }
+
+    .cfg-card-title-wrap p {
+      font-size: 0.8rem;
+      color: var(--suave);
+      margin: 0;
+    }
+
+    .cfg-card-body {
+      padding: 20px 24px;
+    }
+
+    /* ── Toggle Switch (master acessibilidade) ── */
+    .cfg-master-switch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cfg-switch-label {
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transition: color 0.3s;
+    }
+
+    .cfg-switch-label.on {
+      color: #10b981;
+    }
+
+    .cfg-switch-label.off {
+      color: var(--suave);
+    }
+
+    .cfg-switch-wrap {
+      position: relative;
+      width: 52px;
+      height: 28px;
+    }
+
+    .cfg-switch-wrap input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .cfg-switch-track {
+      position: absolute;
+      inset: 0;
+      background: rgba(100, 116, 139, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .cfg-switch-track::before {
+      content: "";
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      left: 2px;
+      top: 2px;
+      background: #94a3b8;
+      border-radius: 50%;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .cfg-switch-wrap input:checked+.cfg-switch-track {
+      background: rgba(16, 185, 129, 0.3);
+      border-color: #10b981;
+    }
+
+    .cfg-switch-wrap input:checked+.cfg-switch-track::before {
+      transform: translateX(23px);
+      background: #10b981;
+    }
+
+    /* ── Grade de opções de acessibilidade ── */
+    .acc-opts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+      margin-top: 4px;
+    }
+
+    .acc-opt-panel {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--borda, rgba(255, 255, 255, 0.07));
+      border-radius: 14px;
+      overflow: hidden;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .acc-opt-panel:hover {
+      background: rgba(59, 130, 246, 0.04);
+      border-color: rgba(59, 130, 246, 0.15);
+    }
+
+    .acc-opt-panel-header {
+      padding: 10px 14px 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(59, 130, 246, 0.06);
+      border-bottom: 1px solid var(--borda, rgba(255, 255, 255, 0.06));
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #60a5fa;
+    }
+
+    .acc-opt-panel-body {
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .acc-opt-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--borda, rgba(255, 255, 255, 0.05));
+      font-size: 0.83rem;
+      font-weight: 600;
+      color: var(--texto, #cbd5e1);
+      cursor: pointer;
+    }
+
+    .acc-opt-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .acc-opt-chk {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      accent-color: #3b82f6;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .acc-opt-select {
+      width: 100%;
+      padding: 7px 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--borda, rgba(255, 255, 255, 0.1));
+      border-radius: 9px;
+      color: var(--texto, #cbd5e1);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .acc-opt-select:focus {
+      border-color: #3b82f6;
+    }
+
+    .acc-test-btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .acc-test-btn {
+      flex: 1;
+      padding: 8px;
+      border-radius: 9px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      border: 1px solid;
+      transition: all 0.2s;
+    }
+
+    .acc-test-btn.verde {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.25);
+      color: #10b981;
+    }
+
+    .acc-test-btn.verde:hover {
+      background: rgba(16, 185, 129, 0.2);
+    }
+
+    .acc-test-btn.vermelho {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    .acc-test-btn.vermelho:hover {
+      background: rgba(239, 68, 68, 0.18);
+    }
+
+    .acc-fonte-btns {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .acc-fonte-btn {
+      flex: 1;
+      padding: 8px;
+      border-radius: 9px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--texto, #cbd5e1);
+      transition: all 0.2s;
+    }
+
+    .acc-fonte-btn:hover {
+      background: rgba(59, 130, 246, 0.12);
+      border-color: rgba(59, 130, 246, 0.25);
+      color: #60a5fa;
+    }
+
+    /* ── Grade de outras cards (2 col) ── */
+    .cfg-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .cfg-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .cfg-action-btn.primario {
+      background: var(--primaria);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+    }
+
+    .cfg-action-btn.primario:hover {
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .cfg-action-btn.suave {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--texto);
+    }
+
+    .cfg-action-btn.suave:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Separador de seção */
+    .cfg-section-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--suave);
+      margin: 28px 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cfg-section-label::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--borda, rgba(255, 255, 255, 0.07));
+    }
+  </style>
+</head>
+
+<body>
+  <a href="#conteudo" class="skip-link"
+    style="position:absolute;left:-9999px;top:0;background:#000;color:#fff;padding:8px 16px;z-index:99999;border-radius:0 0 8px 0;font-weight:700;text-decoration:none;">
+    Pular para o conteúdo
+  </a>
+
+  <div class="layout">
+    <aside class="sidebar" aria-label="Navegação principal" id="sidebar">
+      {% include 'partials/navbar.html' %}
+    </aside>
+
+    <div class="main">
+      <header class="topbar" role="banner">
+        <div class="topbar__left">
+          <button class="topbar__btn topbar__mobile-toggle" onclick="abrirSidebar()" aria-label="Abrir menu">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <span class="topbar__greeting">Olá, <strong>{{ session.usuario_nome }}</strong></span>
+        </div>
+        <div class="topbar__actions">
+          <button class="topbar__btn" onclick="alternarTema()" aria-label="Alternar tema" id="btnTema">
+            <i class="fa-solid fa-moon"></i>
+          </button>
+          <a class="topbar__btn" href="{{ url_for('pagina_configuracoes') }}" title="Configurações">
+            <i class="fa-solid fa-gear"></i>
+          </a>
+          <a class="topbar__btn" href="{{ url_for('pagina_perfil') }}" title="Perfil">
+            <i class="fa-solid fa-user"></i>
+          </a>
+        </div>
+      </header>
+
+      <main id="conteudo" class="pagina" role="main">
+        <div class="container">
+
+          <!-- Cabeçalho da página -->
+          <header class="cfg-page-header">
+            <div class="migalhas">Início &gt; Configurações</div>
+            <h1 class="h1">Configurações</h1>
+            <p>Gerencie acessibilidade, aparência e preferências da plataforma.</p>
+          </header>
+
+          <!-- ════ CARD ACESSIBILIDADE ════ -->
+          <div class="cfg-card">
+            <div class="cfg-card-header">
+              <div class="cfg-card-header-left">
+                <div class="cfg-card-icon azul">
+                  <i class="fa-solid fa-universal-access"></i>
+                </div>
+                <div class="cfg-card-title-wrap">
+                  <h2>Recursos de Acessibilidade & Inclusão Digital</h2>
+                  <p>Ative para habilitar o leitor de voz, filtros visuais e widget flutuante.</p>
+                </div>
+              </div>
+
+              <div class="cfg-master-switch" id="cfg-master-switch-container">
+                <span class="cfg-switch-label off" id="cfgAccLabel">Desativado</span>
+                <label class="cfg-switch-wrap" aria-label="Ativar ou desativar recursos de acessibilidade">
+                  <input type="checkbox" id="cfgToggleAcc">
+                  <span class="cfg-switch-track"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Sub-opções (ficam visíveis apenas quando ativado) -->
+            <div class="cfg-card-body" id="cfgAccOpts" style="display:none;">
+              <div class="acc-opts-grid">
+
+                <!-- LEITOR DE VOZ -->
+                <div class="acc-opt-panel">
+                  <div class="acc-opt-panel-header">
+                    <i class="fa-solid fa-volume-high"></i> Leitor por Voz
+                  </div>
+                  <div class="acc-opt-panel-body">
+                    <p style="font-size:0.78rem; color:var(--suave); margin:0 0 8px;">Ouve o conteúdo com destaque
+                      visual do trecho ativo.</p>
+                    <div class="acc-test-btns">
+                      <button type="button" class="acc-test-btn verde" id="cfgBtnLer">
+                        <i class="fa-solid fa-play"></i> Testar
+                      </button>
+                      <button type="button" class="acc-test-btn vermelho" id="cfgBtnParar">
+                        <i class="fa-solid fa-stop"></i> Parar
+                      </button>
+                    </div>
+                    <select class="acc-opt-select" id="cfgVelocidadeVoz" aria-label="Velocidade da voz"
+                      style="margin-top:10px;">
+                      <option value="0.7">Lenta (0.7x)</option>
+                      <option value="1.0" selected>Normal (1.0x)</option>
+                      <option value="1.3">Rápida (1.3x)</option>
+                      <option value="1.6">Muito Rápida (1.6x)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- TAMANHO DE TEXTO -->
+                <div class="acc-opt-panel">
+                  <div class="acc-opt-panel-header">
+                    <i class="fa-solid fa-text-height"></i> Tamanho do Texto
+                  </div>
+                  <div class="acc-opt-panel-body">
+                    <p style="font-size:0.78rem; color:var(--suave); margin:0 0 8px;">Ajusta a tipografia de toda a
+                      plataforma.</p>
+                    <div class="acc-fonte-btns">
+                      <button type="button" class="acc-fonte-btn" id="cfgBtnAumentar">
+                        <i class="fa-solid fa-plus"></i> A+
+                      </button>
+                      <button type="button" class="acc-fonte-btn" id="cfgBtnDiminuir">
+                        <i class="fa-solid fa-minus"></i> A−
+                      </button>
+                      <button type="button" class="acc-fonte-btn" id="cfgBtnResetar" title="Resetar fonte">
+                        <i class="fa-solid fa-rotate-left"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- VISÃO & DALTONISMO -->
+                <div class="acc-opt-panel">
+                  <div class="acc-opt-panel-header">
+                    <i class="fa-solid fa-eye"></i> Visão & Daltonismo
+                  </div>
+                  <div class="acc-opt-panel-body">
+                    <label class="acc-opt-row">
+                      <span>Alto Contraste Visual</span>
+                      <input type="checkbox" class="acc-opt-chk" id="cfgAltoContraste">
+                    </label>
+                    <label class="acc-opt-row">
+                      <span>Fonte para Dislexia</span>
+                      <input type="checkbox" class="acc-opt-chk" id="cfgDyslexia">
+                    </label>
+                    <label class="acc-opt-row">
+                      <span>Cursor Ampliado</span>
+                      <input type="checkbox" class="acc-opt-chk" id="cfgCursorGrande">
+                    </label>
+                    <select class="acc-opt-select" id="cfgDaltonismo" aria-label="Filtro de daltonismo">
+                      <option value="nenhum">— Sem filtro —</option>
+                      <option value="deuteranopia">Deuteranopia (verde)</option>
+                      <option value="protanopia">Protanopia (vermelho)</option>
+                      <option value="tritanopia">Tritanopia (azul)</option>
+                      <option value="acromatopsia">Acromatopsia</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- NAVEGAÇÃO & INCLUSÃO -->
+                <div class="acc-opt-panel">
+                  <div class="acc-opt-panel-header">
+                    <i class="fa-solid fa-keyboard"></i> Navegação & Inclusão
+                  </div>
+                  <div class="acc-opt-panel-body">
+                    <label class="acc-opt-row">
+                      <span>Destaque de Foco (Tab)</span>
+                      <input type="checkbox" class="acc-opt-chk" id="cfgFocoAlto">
+                    </label>
+                    <label class="acc-opt-row">
+                      <span>Reduzir Animações</span>
+                      <input type="checkbox" class="acc-opt-chk" id="cfgSemAnimacoes">
+                    </label>
+                    <label class="acc-opt-row">
+                      <span>Tradutor VLibras (LIBRAS)</span>
+                      <input type="checkbox" class="acc-opt-chk" id="cfgVlibras">
+                    </label>
+                    <p style="font-size:0.72rem; color:var(--suave); margin:4px 0 0;">
+                      <i class="fa-solid fa-circle-info"></i>
+                      Atalhos: <strong>Alt+A</strong> painel · <strong>Alt+L</strong> ler · <strong>Alt+C</strong>
+                      contraste
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ════ DEMAIS CONFIGURAÇÕES ════ -->
+          <div class="cfg-section-label">Preferências gerais</div>
+          <div class="cfg-cards-grid">
+
+            <!-- TEMA -->
+            <div class="cfg-card">
+              <div class="cfg-card-header">
+                <div class="cfg-card-header-left">
+                  <div class="cfg-card-icon roxo">
+                    <i class="fa-solid fa-palette"></i>
+                  </div>
+                  <div class="cfg-card-title-wrap">
+                    <h2>Aparência & Tema</h2>
+                    <p>Alterne entre modo claro e escuro.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="cfg-card-body">
+                <button class="cfg-action-btn primario" type="button" onclick="alternarTema()"
+                  aria-label="Alternar modo claro/escuro">
+                  <i class="fa-solid fa-moon" id="iconeTema"></i>
+                  <span id="textoTema">Alternar para Modo Escuro</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- CONTATO / SUPORTE -->
+            <div class="cfg-card">
+              <div class="cfg-card-header">
+                <div class="cfg-card-header-left">
+                  <div class="cfg-card-icon verde">
+                    <i class="fa-solid fa-headset"></i>
+                  </div>
+                  <div class="cfg-card-title-wrap">
+                    <h2>Suporte & Contato</h2>
+                    <p>Dúvidas ou problemas com a plataforma.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="cfg-card-body">
+                <a href="{{ url_for('pagina_contato') }}" class="cfg-action-btn primario"
+                  aria-label="Ir para a página de contato">
+                  <i class="fa-solid fa-envelope"></i> Falar com o Suporte
+                </a>
+              </div>
+            </div>
+
+          </div>
+
+          {% include 'partials/footer.html' %}
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Partials universais -->
+  {% include 'partials/painel_acessibilidade.html' %}
+  {% include 'partials/navbar_mobile.html' %}
+
+  <!-- VLibras (oculto por padrão, ativado via acc) -->
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='acessibilidade/acessibilidade.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/configuracao.js') }}"></script>
+</body>
+
+</html>

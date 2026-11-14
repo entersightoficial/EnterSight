@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="EnterSight — Crie sua conta gratuita e comece a analisar seus dados." />
+  <title>EnterSight • Criar Conta</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilo.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='acessibilidade/acessibilidade.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}" />
+
+  <!-- icon -->
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicons/apple-touch-icon.png') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicons/favicon-32x32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicons/favicon-16x16.png') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicons/favicon.ico') }}">
+
+  <style>
+    html, body { height: 100%; overflow: auto; }
+
+    .auth-wrapper {
+      display: grid;
+      grid-template-columns: 1fr 520px;
+      min-height: 100vh;
+    }
+
+    .auth-panel {
+      background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 50%, #60A5FA 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 60px;
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .auth-panel::before {
+      content: '';
+      position: absolute;
+      top: -30%; right: -20%;
+      width: 600px; height: 600px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 50%;
+    }
+
+    .auth-panel::after {
+      content: '';
+      position: absolute;
+      bottom: -20%; left: -10%;
+      width: 400px; height: 400px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 50%;
+    }
+
+    .auth-panel__logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 56px;
+      position: relative; z-index: 1;
+    }
+
+    .auth-panel__logo-icon {
+      width: 44px; height: 44px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .auth-panel__tagline {
+      font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      opacity: 0.7; margin-bottom: 16px;
+      position: relative; z-index: 1;
+    }
+
+    .auth-panel__title {
+      font-size: 2rem; font-weight: 800;
+      line-height: 1.2; letter-spacing: -0.02em;
+      margin-bottom: 20px;
+      position: relative; z-index: 1;
+    }
+
+    .auth-panel__desc {
+      font-size: 1rem; opacity: 0.85;
+      line-height: 1.6; max-width: 380px;
+      position: relative; z-index: 1; margin-bottom: 36px;
+    }
+
+    .auth-panel__features {
+      list-style: none; padding: 0; margin: 0;
+      display: flex; flex-direction: column; gap: 12px;
+      position: relative; z-index: 1;
+    }
+
+    .auth-panel__features li {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.875rem; opacity: 0.9;
+    }
+
+    .auth-panel__features li i {
+      width: 22px; height: 22px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; flex-shrink: 0;
+    }
+
+    .auth-form-panel {
+      background: var(--fundo);
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--borda);
+    }
+
+    .auth-form-panel__inner {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 48px 44px;
+    }
+
+    .auth-form-panel__logo-mobile {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-size: 1rem; font-weight: 800;
+      color: var(--texto);
+      margin-bottom: 32px;
+      text-decoration: none;
+    }
+
+    .auth-form-panel__logo-mobile .icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #3B82F6, #60A5FA);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 15px;
+    }
+
+    .auth-form-panel__heading {
+      font-size: 1.625rem; font-weight: 800;
+      letter-spacing: -0.02em; color: var(--texto); margin-bottom: 4px;
+    }
+
+    .auth-form-panel__sub {
+      font-size: 0.875rem; color: var(--suave); margin-bottom: 28px;
+    }
+
+    .auth-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+
+    .auth-field label {
+      font-size: 0.8rem; font-weight: 600; color: var(--texto);
+    }
+
+    .auth-input-wrap { position: relative; }
+
+    .auth-input {
+      width: 100%;
+      padding: 10px 14px 10px 38px;
+      border: 1.5px solid var(--borda);
+      border-radius: 9px;
+      font-family: var(--fonte); font-size: 0.875rem;
+      color: var(--texto); background: var(--cartao);
+      transition: all 0.15s; appearance: none;
+    }
+
+    .auth-input::placeholder { color: var(--suave); opacity: 0.6; }
+
+    .auth-input:focus {
+      outline: none;
+      border-color: var(--primaria);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+    }
+
+    .auth-input-icon {
+      position: absolute; left: 12px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--suave); font-size: 12px; pointer-events: none;
+    }
+
+    .auth-input-toggle {
+      position: absolute; right: 12px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none;
+      color: var(--suave); cursor: pointer; padding: 4px; font-size: 12px;
+      transition: color 0.15s;
+    }
+
+    .auth-input-toggle:hover { color: var(--texto); }
+
+    .auth-input--error { border-color: #DC2626 !important; }
+    .auth-input--success { border-color: #16A34A !important; }
+
+    .auth-field-msg {
+      font-size: 0.72rem; font-weight: 500;
+      padding: 2px 0; display: none;
+    }
+
+    .auth-field-msg--error { color: #DC2626; display: block; }
+    .auth-field-msg--success { color: #16A34A; display: block; }
+    .auth-field-msg--hint { color: var(--suave); display: block; }
+
+    .auth-terms {
+      display: flex; align-items: flex-start;
+      gap: 10px; font-size: 0.8rem;
+      color: var(--texto); margin-bottom: 20px; line-height: 1.5;
+    }
+
+    .auth-terms input[type="checkbox"] {
+      width: 16px; height: 16px;
+      accent-color: var(--primaria); cursor: pointer; flex-shrink: 0; margin-top: 2px;
+    }
+
+    .auth-terms a { color: var(--primaria); font-weight: 600; text-decoration: none; }
+    .auth-terms a:hover { text-decoration: underline; }
+
+    .auth-submit {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
+      color: #fff; border: none; border-radius: 10px;
+      font-family: var(--fonte); font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 8px; transition: all 0.2s;
+      box-shadow: 0 4px 14px rgba(59,130,246,0.3); margin-bottom: 16px;
+    }
+
+    .auth-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(59,130,246,0.4); }
+    .auth-submit:active { transform: translateY(0); }
+    .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .auth-footer-links {
+      display: flex; justify-content: center; align-items: center;
+      gap: 6px; font-size: 0.8rem; color: var(--suave); flex-wrap: wrap;
+    }
+
+    .auth-footer-links a { color: var(--primaria); font-weight: 600; text-decoration: none; }
+    .auth-footer-links a:hover { text-decoration: underline; }
+
+    .auth-alert-error {
+      background: rgba(220,38,38,0.08);
+      border: 1px solid rgba(220,38,38,0.25);
+      border-left: 4px solid #DC2626;
+      color: #B91C1C; border-radius: 8px;
+      padding: 10px 14px; font-size: 0.8rem;
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    /* Estilos para Seleção de Perfil MEI vs ME */
+    .perfil-selector-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+      margin-bottom: 16px;
+    }
+
+    .perfil-option-card {
+      border: 1.5px solid var(--borda);
+      background: var(--cartao);
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .perfil-option-card:hover {
+      border-color: var(--primaria);
+      background: rgba(59, 130, 246, 0.03);
+    }
+
+    .perfil-option-card.selected {
+      border-color: var(--primaria);
+      background: rgba(59, 130, 246, 0.08);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    .perfil-option-card input[type="radio"] {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      accent-color: var(--primaria);
+    }
+
+    .perfil-card-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--texto);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .perfil-card-desc {
+      font-size: 0.72rem;
+      color: var(--suave);
+      line-height: 1.3;
+    }
+
+    .cnpj-status-box {
+      margin-top: 6px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      line-height: 1.4;
+    }
+
+    .cnpj-status-box.sucesso {
+      display: flex;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #059669;
+    }
+
+    .cnpj-status-box.carregando {
+      display: flex;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #2563eb;
+    }
+
+    .cnpj-status-box.erro {
+      display: flex;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #dc2626;
+    }
+
+    /* Responsivo */
+    @media (max-width: 900px) {
+      .auth-wrapper { grid-template-columns: 1fr; }
+      .auth-panel { display: none; }
+      .auth-form-panel { border-left: none; min-height: 100vh; }
+      .auth-form-panel__logo-mobile { display: flex; }
+    }
+
+    @media (max-width: 480px) {
+      .auth-form-panel__inner { padding: 32px 20px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="auth-wrapper" data-ia-help="page_cadastro">
+
+    <!-- Painel visual esquerdo -->
+    <div class="auth-panel" aria-hidden="true" >
+    
+        <a class="sidebar__logo" href="{{ url_for('pagina_landing') }}" aria-label="EnterSight - Início">
+        <!-- Logo Hexagonal (EnterSight) -->
+            <svg viewBox="374 42 212 241" width="38" height="42" aria-label="Logo EnterSight" role="img" style="display: inline-block; flex-shrink: 0; vertical-align: middle;">
+              <g>
+                <path d="M480,52 L577,106 L577,220 L480,273 L384,220 L384,106Z" fill="#3b82f6" stroke="#3b82f6" stroke-width="10" stroke-linejoin="round"/>
+                <path d="M426,161 L460,132 L486,150 L520,115" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M529,112 V201 H443" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M463,181 L443,202 L463,222" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="529" cy="107" r="13" fill="#ffffff"/>
+              </g>
+            </svg>
+            <span class="sidebar__logo-text" style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 1.9rem; color: var(--texto); letter-spacing: -0.02em; white-space: nowrap; display: inline-flex;">
+              <span style="font-weight: 700;">Enter</span><span style="font-weight: 300;">Sight</span>
+            </span>
+        </a>
+      
+
+      <div class="auth-panel__tagline">Comece gratuitamente</div>
+      <h1 class="auth-panel__title">
+        Sua plataforma<br>de BI começa<br>aqui.
+      </h1>
+      <p class="auth-panel__desc">
+        Crie sua conta e tenha acesso imediato a gráficos, análises e
+        inteligência artificial para o seu negócio.
+      </p>
+
+      <ul class="auth-panel__features">
+        <li><i class="fa-solid fa-check"></i> Dashboard completo com KPIs</li>
+        <li><i class="fa-solid fa-check"></i> Análises automáticas por IA</li>
+        <li><i class="fa-solid fa-check"></i> Relatórios em PDF</li>
+        <li><i class="fa-solid fa-check"></i> Upload de CSV e dados manuais</li>
+        <li><i class="fa-solid fa-check"></i> Gráficos interativos avançados</li>
+        <li><i class="fa-solid fa-check"></i> Agentes de IA</li>
+      </ul>
+    </div>
+
+    <!-- Painel do formulário -->
+    <div class="auth-form-panel">
+      <div class="auth-form-panel__inner">
+
+        <!-- Logo mobile -->
+        <a href="{{ url_for('pagina_landing') }}" class="auth-form-panel__logo-mobile">
+               <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo EnterSight" style="max-width: 65px; height: auto;">
+          EnterSight
+        </a>
+
+        <h2 class="auth-form-panel__heading">Criar conta</h2>
+        <p class="auth-form-panel__sub">Preencha os dados abaixo para começar</p>
+
+        {% if error_cad %}
+        <div class="auth-alert-error" role="alert">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          <span>{{ msg or 'Erro ao criar conta. Tente novamente.' }}</span>
+        </div>
+        {% endif %}
+
+        <form id="formularioCadastro" action="{{ url_for('pg_cadastro') }}" method="POST">
+
+          <div class="auth-field">
+            <label for="nome">Nome completo <span style="color:#DC2626">*</span></label>
+            <div class="auth-input-wrap">
+              <input type="text" id="nome" name="nome"
+                     class="auth-input"
+                     placeholder="Ex: Arthur Oliveira"
+                     autocomplete="name" required />
+            </div>
+          </div>
+
+          <div class="auth-field">
+            <label for="email">Email <span style="color:#DC2626">*</span></label>
+            <div class="auth-input-wrap">
+              <input type="email" id="email" name="email"
+                     class="auth-input"
+                     value="{{ email_preenchido|default('') }}"
+                     {% if email_preenchido %}readonly style="background: rgba(243, 244, 246, 0.7); cursor: not-allowed;"{% endif %}
+                     placeholder="seu@email.com"
+                     autocomplete="email" required />
+            </div>
+          </div>
+
+          <div class="auth-field">
+            <label for="telefone">WhatsApp / Celular <span style="font-size:0.75rem; color:var(--suave); font-weight:400;">(Opcional)</span></label>
+            <div class="auth-input-wrap">
+              <input type="tel" id="telefone" name="telefone"
+                     class="auth-input"
+                     placeholder="(11) 99999-9999"
+                     autocomplete="tel" />
+            </div>
+          </div>
+
+          <div class="auth-field">
+            <label for="cnpj">CNPJ da Empresa <span style="font-size:0.75rem; color:var(--suave); font-weight:400;">(Recomendado / Opcional)</span></label>
+            <div class="auth-input-wrap">
+              <input type="text" id="cnpj" name="cnpj"
+                     class="auth-input"
+                     placeholder="00.000.000/0000-00"
+                     maxlength="18"
+                     autocomplete="off" />
+            </div>
+            <div id="cnpjFeedback" class="cnpj-status-box"></div>
+          </div>
+
+          <!-- Campos Ocultos para enriquecimento de dados cadastrais -->
+          <input type="hidden" id="razao_social" name="razao_social" value="" />
+          <input type="hidden" id="data_abertura" name="data_abertura" value="" />
+
+          <!-- Plano Contratado Confirmado pelo Stripe -->
+          <div class="auth-field" style="margin-bottom: 20px;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: var(--texto); display: flex; align-items: center; justify-content: space-between;">
+              <span>Plano Contratado (Stripe):</span>
+              <span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; background: rgba(37, 99, 235, 0.1); color: #2563eb; font-weight: 700;">
+                {{ 'Plano Anual • 12 meses' if periodicidade_contratada == 'anual' else 'Plano Mensal' }}
+              </span>
+            </label>
+            <div style="background: rgba(59, 130, 246, 0.08); border: 1.5px solid rgba(59, 130, 246, 0.35); border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);">
+                  <i class="fa-solid fa-crown text-base"></i>
+                </div>
+                <div>
+                  <div style="font-weight: 800; font-size: 0.95rem; color: var(--texto, #111827); line-height: 1.2;">
+                    EnterSight {{ plano_contratado|default('ME') }}
+                  </div>
+                  <div style="font-size: 0.75rem; color: #16a34a; font-weight: 600; margin-top: 3px; display: flex; align-items: center; gap: 5px;">
+                    {% if metodo_pagamento == 'pix' %}
+                      <i class="fa-solid fa-bolt text-emerald-500"></i> Aprovado via Pix (20% OFF)
+                    {% elif periodicidade_contratada == 'anual' %}
+                      <i class="fa-solid fa-circle-check text-emerald-500"></i> Confirmado no Cartão (20% OFF)
+                    {% else %}
+                      <i class="fa-solid fa-circle-check text-emerald-500"></i> Pagamento Confirmado no Stripe
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <div style="text-align: right; flex-shrink: 0;">
+                <div style="font-size: 0.95rem; font-weight: 800; color: #2563eb;">
+                  {% if periodicidade_contratada == 'anual' %}
+                    {% if plano_contratado == 'MEI' %}R$ 2.400,00<span style="font-size:0.75rem; font-weight:600; color:var(--suave);">/ano</span>{% else %}R$ 3.360,00<span style="font-size:0.75rem; font-weight:600; color:var(--suave);">/ano</span>{% endif %}
+                  {% else %}
+                    {% if plano_contratado == 'MEI' %}R$ 250,00<span style="font-size:0.75rem; font-weight:600; color:var(--suave);">/mês</span>{% else %}R$ 350,00<span style="font-size:0.75rem; font-weight:600; color:var(--suave);">/mês</span>{% endif %}
+                  {% endif %}
+                </div>
+                {% if periodicidade_contratada == 'anual' %}
+                  <div style="font-size: 0.68rem; color: #059669; font-weight: 700; margin-top: 1px;">
+                    {% if plano_contratado == 'MEI' %}Equivale a R$ 200/mês{% else %}Equivale a R$ 280/mês{% endif %}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <input type="hidden" name="tipo_perfil" value="{{ plano_contratado|default('ME') }}" />
+            <input type="hidden" name="periodicidade" value="{{ periodicidade_contratada|default('mensal') }}" />
+            <input type="hidden" name="metodo" value="{{ metodo_pagamento|default('card') }}" />
+            <input type="hidden" name="session_id" value="{{ session_id|default('') }}" />
+          </div>
+
+          <div class="auth-field">
+            <label for="senha">Senha <span style="color:#DC2626">*</span></label>
+            <div class="auth-input-wrap">
+              <input type="password" id="senha" name="senha"
+                     class="auth-input"
+                     style="padding-right:38px;"
+                     placeholder="Mínimo 8 caracteres"
+                     autocomplete="new-password"
+                     aria-describedby="dica-senha" required />
+              <button type="button" class="auth-input-toggle"
+                      onclick="togglePass('senha',this)"
+                      aria-label="Mostrar senha">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+            <span id="mensagem" class="auth-field-msg"></span>
+            <span id="dica-senha" class="auth-field-msg auth-field-msg--hint">
+              Mínimo 8 caracteres com letras e números.
+            </span>
+          </div>
+
+          <div class="auth-field">
+            <label for="confirmar">Confirmar senha <span style="color:#DC2626">*</span></label>
+            <div class="auth-input-wrap">
+              <input type="password" id="confirmar" name="confirmar"
+                     class="auth-input"
+                     style="padding-right:38px;"
+                     placeholder="Repita a senha"
+                     autocomplete="new-password" required />
+              <button type="button" class="auth-input-toggle"
+                      onclick="togglePass('confirmar',this)"
+                      aria-label="Mostrar confirmação de senha">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="auth-terms">
+            <input type="checkbox" id="termos" name="termos" required />
+            <label for="termos">
+              Concordo com os
+              <a href="{{ url_for('pagina_termos_uso') }}" target="_blank">
+                Termos de Uso e Política de Privacidade
+              </a>
+            </label>
+          </div>
+
+          <button type="submit" class="auth-submit" id="btnCadastrar">
+            <i class="fa-solid fa-user-plus"></i>
+            Criar conta gratuita
+          </button>
+
+        </form>
+
+        <div class="auth-footer-links">
+          <span>Já tem conta?</span>
+          <a href="{{ url_for('pagina_login') }}">Fazer login →</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  {% include 'partials/painel_acessibilidade.html' %}
+
+
+</div>
+
+<script src="{{ url_for('static', filename='acessibilidade/acessibilidade.js') }}"></script>
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cadastro.js') }}"></script>
+</body>
+</html>

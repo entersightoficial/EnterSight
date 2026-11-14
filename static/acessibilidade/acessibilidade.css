@@ -1,0 +1,536 @@
+/**
+ * ============================================================
+ * SISTEMA DE ACESSIBILIDADE — DataInsight
+ * Design Glassmorphism Dark / Inclusão Digital Completa
+ * ============================================================
+ */
+
+:root {
+  --acc-escala: 1;
+}
+
+html {
+  font-size: calc(16px * var(--acc-escala)) !important;
+}
+
+/* ════════════════════════════════════════════════════════════
+   BOTÃO FLUTUANTE — Canto inferior esquerdo
+   ════════════════════════════════════════════════════════════ */
+.acc-flutuante-wrapper {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 10900;
+  display: none !important;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.acc-flutuante-wrapper.acc-visivel {
+  display: flex !important;
+}
+
+.acc-btn-toggle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+  color: #ffffff;
+  font-size: 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.5);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  position: relative;
+}
+
+.acc-btn-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.7);
+}
+
+.acc-btn-toggle:focus-visible {
+  outline: 3px solid #ffd700;
+  outline-offset: 3px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   PAINEL SLIDE-IN (MODAL) — Lado esquerdo
+   ════════════════════════════════════════════════════════════ */
+.acc-painel {
+  position: fixed;
+  top: 0;
+  left: -400px;
+  width: 370px;
+  max-width: 90vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 10950;
+  display: flex;
+  flex-direction: column;
+  background: #0d1527;
+  color: #f1f5f9;
+  border-right: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 10px 0 40px rgba(0, 0, 0, 0.7);
+  transition: left 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.acc-painel.acc-aberto {
+  left: 0 !important;
+}
+
+.acc-painel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: rgba(59, 130, 246, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.acc-painel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.acc-painel-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.acc-painel-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.acc-painel-subtitle {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.acc-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.acc-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+/* ── Corpo do painel ── */
+.acc-painel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.35) transparent;
+}
+
+.acc-painel-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.acc-painel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.acc-painel-body::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.35);
+  border-radius: 4px;
+}
+
+.acc-painel-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.6);
+}
+
+.acc-secao {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.acc-secao-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(59, 130, 246, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-top-left-radius: 13px;
+  border-top-right-radius: 13px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.acc-secao-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.acc-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.acc-linha-label {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.acc-linha-desc {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+/* ── Toggle Switch ── */
+.acc-toggle {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.acc-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.acc-toggle-track {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s;
+}
+
+.acc-toggle-track::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  top: 2px;
+  background: #cbd5e1;
+  border-radius: 50%;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s;
+}
+
+.acc-toggle input:checked + .acc-toggle-track {
+  background: #2563eb;
+  border-color: #3b82f6;
+}
+
+.acc-toggle input:checked + .acc-toggle-track::before {
+  transform: translateX(18px);
+  background: #ffffff;
+}
+
+/* ── Controles de Fonte ── */
+.acc-fonte-controles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.acc-fonte-display {
+  flex: 1;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 8px;
+  padding: 6px 4px;
+}
+
+.acc-btn-fonte {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 800;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.acc-btn-fonte:hover {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+/* ── Controles de Voz ── */
+.acc-voz-controles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.acc-btn-voz {
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.acc-btn-voz.ler {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.acc-btn-voz.ler:hover {
+  background: rgba(16, 185, 129, 0.35);
+}
+
+.acc-btn-voz.parar {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.acc-btn-voz.parar:hover {
+  background: rgba(239, 68, 68, 0.35);
+}
+
+.acc-select {
+  width: 100%;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f1f5f9;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* ── Atalhos de Teclado ── */
+.acc-atalhos {
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  border-radius: 10px;
+  padding: 10px 12px;
+  flex-shrink: 0;
+}
+
+.acc-atalhos-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #60a5fa;
+  margin-bottom: 6px;
+}
+
+.acc-atalho-linha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.acc-kbd {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+  font-family: monospace;
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ── Botão Resetar ── */
+.acc-btn-reset {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+
+.acc-btn-reset:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+/* ════════════════════════════════════════════════════════════
+   OVERLAY
+   ════════════════════════════════════════════════════════════ */
+.acc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 10940;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.acc-overlay.acc-aberto {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* ════════════════════════════════════════════════════════════
+   MODOS VISUAIS NO DOCUMENTO
+   ════════════════════════════════════════════════════════════ */
+.acc-alto-contraste,
+.acc-alto-contraste * {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border-color: #ffffff !important;
+}
+
+.acc-alto-contraste a,
+.acc-alto-contraste a * {
+  color: #ffff00 !important;
+  text-decoration: underline !important;
+}
+
+.acc-alto-contraste button,
+.acc-alto-contraste .botao {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #ffffff !important;
+}
+
+.acc-dyslexia,
+.acc-dyslexia * {
+  font-family: "Comic Sans MS", "Trebuchet MS", Arial, sans-serif !important;
+  letter-spacing: 0.05em !important;
+  word-spacing: 0.1em !important;
+  line-height: 1.8 !important;
+}
+
+.acc-sem-animacoes * {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+.acc-foco-alto *:focus-visible,
+*:focus-visible {
+  outline: 3px solid #ffd700 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.8) !important;
+}
+
+.acc-cursor-grande,
+.acc-cursor-grande * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='8' cy='8' r='7' fill='%232563eb' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E") 8 8, auto !important;
+}
+
+.acc-lendo-ativo {
+  outline: 3px solid #f59e0b !important;
+  background: rgba(245, 158, 11, 0.22) !important;
+  border-radius: 4px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   VLIBRAS CONTROL — 100% oculto a menos que ativado
+   ════════════════════════════════════════════════════════════ */
+#Vlibras,
+#Vlibras *,
+[vw],
+[vw] *,
+[vw-access-button],
+.vw-plugin-wrapper,
+.vw-plugin-top-wrapper {
+  display: none !important;
+}
+
+.acc-vlibras-ativo #Vlibras,
+.acc-vlibras-ativo [vw-access-button],
+.acc-vlibras-ativo .vw-plugin-wrapper,
+.acc-vlibras-ativo .vw-plugin-top-wrapper {
+  display: block !important;
+}
+
+.acc-vlibras-ativo #Vlibras * {
+  display: revert !important;
+}
+
+@media (max-width: 640px) {
+  .acc-painel {
+    width: 100vw;
+    left: -100vw;
+  }
+}
