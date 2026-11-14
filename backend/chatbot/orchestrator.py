@@ -1,0 +1,275 @@
+# ==============================================================================
+# orchestrator.py
+# ==============================================================================
+# Este código pertence à plataforma @EnterSight.
+# Todos os códigos da plataforma devem seguir a mesma estrutura de organização
+# em seções numeradas, conforme o padrão abaixo.
+#
+# Observação técnica: o formato original sugerido usava "//" (estilo JavaScript).
+# Em Python, "//" é o operador de divisão inteira e causaria erro de sintaxe,
+# portanto os cabeçalhos foram adaptados para "#", preservando a mesma função
+# de demarcação visual e numeração sequencial.
+
+# ==============================================================================
+# 1. IMPORTAÇÕES E CONFIGURAÇÕES INICIAIS
+# ==============================================================================
+
+import json
+import os
+import urllib.request
+from types import SimpleNamespace
+from typing import List, Optional
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
+
+# ==============================================================================
+# 2. ESTADO GLOBAL
+# ==============================================================================
+
+# Instância única (singleton) do orquestrador, criada sob demanda.
+_ORQUESTRADOR: Optional["GeminiOrchestrator"] = None
+
+
+# ==============================================================================
+# 3. ORQUESTRADOR GEMINI
+# ==============================================================================
+
+class GeminiOrchestrator:
+    """Integração Gemini robusta com alta resiliência, fallback automático e tokens expandidos."""
+
+    # --------------------------------------------------------------------------
+    # 3.1 Inicialização
+    # --------------------------------------------------------------------------
+
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
+        self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        self.model = model or os.getenv("GOOGLE_GEMINI_MODEL", "gemini-3.6-flash")
+        self.candidate_models = self._montar_candidatos()
+        self._modelo_ok = self.candidate_models[0] if self.candidate_models else self.model
+        self._client = None
+
+    # --------------------------------------------------------------------------
+    # 3.2 Candidatos e ordenação de modelos
+    # --------------------------------------------------------------------------
+
+    def _montar_candidatos(self) -> List[str]:
+        vistos = []
+        for nome in (
+            self.model,
+            "gemini-3.6-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash",
+        ):
+            if nome and nome not in vistos:
+                vistos.append(nome)
+        return vistos
+
+    def _modelos_em_ordem(self) -> List[str]:
+        if self._modelo_ok in self.candidate_models:
+            return [self._modelo_ok] + [
+                m for m in self.candidate_models if m != self._modelo_ok
+            ]
+        return list(self.candidate_models)
+
+    # --------------------------------------------------------------------------
+    # 3.3 Cliente SDK e configuração de geração
+    # --------------------------------------------------------------------------
+
+    def _obter_client(self):
+        if self._client is not None:
+            return self._client
+        from google import genai
+        try:
+            self._client = genai.Client(
+                api_key=self.api_key,
+                http_options={"timeout": 35000},
+            )
+        except TypeError:
+            self._client = genai.Client(api_key=self.api_key)
+        return self._client
+
+    def _config_geracao(self):
+        try:
+            from google.genai import types
+            return types.GenerateContentConfig(
+                temperature=0.25,
+                max_output_tokens=4096,
+            )
+        except Exception:
+            return None
+
+    # --------------------------------------------------------------------------
+    # 3.4 API pública
+    # --------------------------------------------------------------------------
+
+    def run(
+        self,
+        prompt: str,
+        anexos: Optional[List[dict]] = None,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(content=self._gerar_resposta(prompt, anexos=anexos))
+
+    # --------------------------------------------------------------------------
+    # 3.5 Estratégia de geração (SDK → REST → mensagem de erro)
+    # --------------------------------------------------------------------------
+
+    def _gerar_resposta(
+        self,
+        prompt: str,
+        anexos: Optional[List[dict]] = None,
+    ) -> str:
+        if not self.api_key:
+            return (
+                "Desculpe — a integração com a API Gemini não está configurada. "
+                "Defina a variável de ambiente `GOOGLE_API_KEY`."
+            )
+
+        texto = self._via_sdk(prompt, anexos=anexos)
+        if texto:
+            return texto
+
+        texto = self._via_rest(prompt, anexos=anexos)
+        if texto:
+            return texto
+
+        return (
+            "Desculpe — não consegui contatar a API Gemini no momento. "
+            "Por favor, verifique a conectividade de rede."
+        )
+
+    # --------------------------------------------------------------------------
+    # 3.6 Estratégia via SDK oficial (google-genai)
+    # --------------------------------------------------------------------------
+
+    def _via_sdk(
+        self,
+        prompt: str,
+        anexos: Optional[List[dict]] = None,
+    ) -> Optional[str]:
+        try:
+            client = self._obter_client()
+            config = self._config_geracao()
+        except Exception as e:
+            print(f"[Gemini SDK Import/Client Falha]: {e}")
+            return None
+
+        for m in self._modelos_em_ordem():
+            try:
+                # Prepara contents com suporte multimodal
+                contents = []
+                if anexos:
+                    from google.genai import types
+                    for anexo in anexos:
+                        b = anexo.get("bytes")
+                        mime = anexo.get("tipo") or anexo.get("mime_type")
+                        if b and mime and (
+                            mime.startswith("image/")
+                            or mime == "application/pdf"
+                        ):
+                            try:
+                                contents.append(
+                                    types.Part.from_bytes(data=b, mime_type=mime)
+                                )
+                            except Exception as pe:
+                                print(f"[Gemini SDK Part Falha]: {pe}")
+                contents.append(prompt)
+                call_contents = contents if len(contents) > 1 else prompt
+
+                kwargs = {"model": m, "contents": call_contents}
+                if config is not None:
+                    kwargs["config"] = config
+                response = client.models.generate_content(**kwargs)
+                if response and getattr(response, "text", None):
+                    self._modelo_ok = m
+                    return response.text.strip()
+            except Exception as sdk_err:
+                print(f"[Gemini SDK ({m}) Falha]: {sdk_err}")
+                continue
+        return None
+
+    # --------------------------------------------------------------------------
+    # 3.7 Estratégia via REST (urllib)
+    # --------------------------------------------------------------------------
+
+    def _via_rest(
+        self,
+        prompt: str,
+        anexos: Optional[List[dict]] = None,
+    ) -> Optional[str]:
+        parts = []
+        if anexos:
+            for anexo in anexos:
+                b64 = anexo.get("base64")
+                mime = anexo.get("tipo") or anexo.get("mime_type")
+                if b64 and mime and (
+                    mime.startswith("image/") or mime == "application/pdf"
+                ):
+                    parts.append(
+                        {
+                            "inlineData": {
+                                "mimeType": mime,
+                                "data": b64,
+                            }
+                        }
+                    )
+        parts.append({"text": prompt})
+
+        payload = {
+            "contents": [{"role": "user", "parts": parts}],
+            "generationConfig": {
+                "temperature": 0.25,
+                "maxOutputTokens": 4096,
+            },
+        }
+        data = json.dumps(payload).encode("utf-8")
+
+        for m in self._modelos_em_ordem():
+            endpoint = (
+                f"https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{m}:generateContent?key={self.api_key}"
+            )
+            req = urllib.request.Request(
+                endpoint,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    body = json.loads(response.read().decode("utf-8"))
+                    candidatos = body.get("candidates") or []
+                    if not candidatos:
+                        continue
+                    content = candidatos[0].get("content") or {}
+                    parts_resp = (
+                        content.get("parts") if isinstance(content, dict) else []
+                    )
+                    textos = [
+                        str(part.get("text", "")).strip()
+                        for part in (parts_resp or [])
+                        if isinstance(part, dict) and part.get("text")
+                    ]
+                    if textos:
+                        self._modelo_ok = m
+                        return "\n".join(textos).strip()
+            except Exception as err:
+                print(f"[Gemini REST ({m}) Erro]: {err}")
+                continue
+        return None
+
+
+# ==============================================================================
+# 4. FÁBRICA / SINGLETON
+# ==============================================================================
+
+def obter_time_agentes() -> GeminiOrchestrator:
+    """Retorna o orquestrador IA reutilizado entre requisições."""
+    global _ORQUESTRADOR
+    if _ORQUESTRADOR is None:
+        _ORQUESTRADOR = GeminiOrchestrator()
+    return _ORQUESTRADOR

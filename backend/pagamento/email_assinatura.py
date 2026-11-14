@@ -1,0 +1,536 @@
+# ==============================================================================
+# email_assinatura.py
+# ==============================================================================
+# Este código pertence à plataforma @EnterSight.
+# Todos os códigos da plataforma devem seguir a mesma estrutura de organização
+# em seções numeradas, conforme o padrão abaixo.
+#
+# Observação técnica: o formato original sugerido usava "//" (estilo JavaScript).
+# Em Python, "//" é o operador de divisão inteira e causaria erro de sintaxe,
+# portanto os cabeçalhos foram adaptados para "#", preservando a mesma função
+# de demarcação visual e numeração sequencial.
+
+"""
+Módulo de envio de e-mail de confirmação de assinatura EnterSight.
+Disparado automaticamente quando o Stripe confirma o pagamento (Mensal ou Anual / Cartão ou Pix).
+"""
+
+# ==============================================================================
+# 1. IMPORTAÇÕES
+# ==============================================================================
+
+import logging
+from datetime import datetime
+
+from flask import current_app
+
+from backend.db import usuario
+from backend.email_helper import criar_mensagem, enviar_email_async
+
+
+# ==============================================================================
+# 2. CONFIGURAÇÃO DE LOGGING
+# ==============================================================================
+
+logger = logging.getLogger(__name__)
+
+
+# ==============================================================================
+# 3. CATÁLOGO DE PLANOS
+# ==============================================================================
+
+PLANOS = {
+    "MEI": {
+        "nome": "EnterSight MEI",
+        "valor_mensal": "R$ 250,00",
+        "valor_anual": "R$ 2.400,00",
+        "valor_anual_mensalizado": "R$ 200,00",
+        "economia_anual": "R$ 600,00",
+        "descricao": "Ideal para Microempreendedores Individuais",
+        "cor": "#6366f1",
+        "cor_clara": "#e0e7ff",
+        "recursos": [
+            "Dashboard financeiro completo",
+            "Analise de IA com Gemini",
+            "Relatórios mensais em PDF",
+            "Controles essenciais MEI",
+            "Suporte prioritario",
+        ],
+    },
+    "ME": {
+        "nome": "EnterSight ME",
+        "valor_mensal": "R$ 350,00",
+        "valor_anual": "R$ 3.360,00",
+        "valor_anual_mensalizado": "R$ 280,00",
+        "economia_anual": "R$ 840,00",
+        "descricao": "Para Microempresas em crescimento",
+        "cor": "#0ea5e9",
+        "cor_clara": "#e0f2fe",
+        "recursos": [
+            "Tudo do plano MEI",
+            "Analises avancadas de BI",
+            "Gestao multi-tabela de dados",
+            "Assistente virtual de IA",
+            "Planejamento financeiro",
+            "Suporte dedicado",
+        ],
+    },
+}
+
+_PLANO_DEFAULT = {
+    "nome": "EnterSight ME",
+    "valor_mensal": "R$ 350,00",
+    "valor_anual": "R$ 3.360,00",
+    "valor_anual_mensalizado": "R$ 280,00",
+    "economia_anual": "R$ 840,00",
+    "descricao": "Plano EnterSight",
+    "cor": "#2563eb",
+    "cor_clara": "#dbeafe",
+    "recursos": ["Acesso a plataforma EnterSight BI & IA"],
+}
+
+
+# ==============================================================================
+# 4. AUXILIARES DE PLANO
+# ==============================================================================
+
+def _info_plano(plano: str) -> dict:
+    return PLANOS.get(str(plano).upper(), _PLANO_DEFAULT)
+
+
+# ==============================================================================
+# 5. GERAÇÃO DO HTML DO E-MAIL
+# ==============================================================================
+
+def _gerar_html_confirmacao(
+    nome_usuario: str,
+    email_usuario: str,
+    plano: str,
+    subscription_id: str,
+    session_id: str,
+    data_pagamento: datetime,
+    is_renovacao: bool = False,
+    periodicidade: str = "mensal",
+    metodo: str = "card",
+) -> str:
+    """Retorna o HTML completo do e-mail de confirmação ou renovação de assinatura com suporte aos planos Mensal e Anual."""
+
+    info = _info_plano(plano)
+    cor = info["cor"]
+    cor_clara = info["cor_clara"]
+    nome_plano = info["nome"]
+    descricao = info["descricao"]
+
+    is_anual = str(periodicidade).strip().lower() == "anual"
+    is_pix = str(metodo).strip().lower() == "pix"
+
+    if is_anual:
+        valor_principal = info["valor_anual"]
+        sufixo_ciclo = "/ano"
+        rotulo_valor = "Valor Anual"
+        nota_economia = (
+            f'<div style="font-size:11px;color:#16a34a;font-weight:600;margin-top:2px;">'
+            f'Equivale a {info["valor_anual_mensalizado"]}/mês • Economia de 20% ({info["economia_anual"]})'
+            f'</div>'
+        )
+        if is_pix:
+            forma_pagto = "PIX À Vista (20% OFF)"
+            tipo_recorrencia = "Pagamento Único (12 Meses de Acesso)"
+            aviso_rodape = (
+                "Sua assinatura anual foi confirmada com sucesso via <strong>Pix à vista</strong>. "
+                "Você possui <strong>12 meses de acesso completo garantido</strong>. "
+                "Como foi realizado à vista, não há cobrança automática em cartão no término do ciclo."
+            )
+            badge_texto = "Plano Anual Ativado • Pix"
+        else:
+            forma_pagto = "Cartão (Crédito ou Débito)"
+            tipo_recorrencia = "Anual (Recorrente a cada 12 meses)"
+            aviso_rodape = (
+                "Sua assinatura anual está ativa com <strong>12 meses de acesso completo</strong> "
+                "e economia de 20%. A cobrança é renovada anualmente no cartão. "
+                "Para gerenciar sua assinatura, acesse as <strong>configurações do perfil</strong> na plataforma."
+            )
+            badge_texto = "Plano Anual Renovado" if is_renovacao else "Plano Anual Ativado (20% OFF)"
+    else:
+        valor_principal = info["valor_mensal"]
+        sufixo_ciclo = "/mês"
+        rotulo_valor = "Valor Mensal"
+        nota_economia = ""
+        forma_pagto = "Cartão (Crédito ou Débito)"
+        tipo_recorrencia = "Mensal (Automática todo mês)"
+        aviso_rodape = (
+            "Sua assinatura é renovada automaticamente a cada mês no Cartão. "
+            "Você receberá um e-mail de confirmação a cada ciclo. "
+            "Para cancelar ou alterar seu plano a qualquer momento, acesse as "
+            "<strong>configurações do perfil</strong> na plataforma."
+        )
+        badge_texto = "Plano Mensal Renovado" if is_renovacao else "Plano Mensal Ativado"
+
+    recursos_itens = ""
+    for r in info["recursos"]:
+        recursos_itens += (
+            '<li style="margin:7px 0; color:#374151; font-size:14px; '
+            'display:flex; align-items:center; gap:8px;">'
+            '<span style="color:#16a34a; font-weight:700;">&#10003;</span> '
+            + r + "</li>"
+        )
+
+    if not data_pagamento:
+        data_pagamento = datetime.now()
+
+    data_str = data_pagamento.strftime("%d/%m/%Y %H:%M")
+    comprovante_id = subscription_id or session_id or "N/A"
+    nome_exibir = nome_usuario or "Cliente"
+
+    if is_renovacao:
+        titulo_principal = "Renovação Confirmada!"
+        subtitulo = f"Parabéns, <strong>{nome_exibir}</strong>! Sua assinatura foi renovada com sucesso."
+    elif is_anual and is_pix:
+        titulo_principal = "Pagamento Pix Aprovado!"
+        subtitulo = f"Parabéns, <strong>{nome_exibir}</strong>! Seu plano anual via Pix foi aprovado e seu acesso de 12 meses está liberado."
+    else:
+        titulo_principal = "Assinatura Confirmada!"
+        subtitulo = f"Parabéns, <strong>{nome_exibir}</strong>! Seu pagamento foi aprovado com sucesso."
+
+    html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{titulo_principal} - EnterSight</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0"
+           style="background:#ffffff;border-radius:16px;overflow:hidden;
+                  box-shadow:0 4px 24px rgba(0,0,0,0.08);max-width:600px;width:100%;">
+
+      <!-- CABECALHO -->
+      <tr>
+        <td style="background:linear-gradient(135deg,{cor} 0%,#1e40af 100%);
+                   padding:40px 40px 32px;text-align:center;">
+          <div style="margin-bottom:16px;">
+            <span style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
+              EnterSight
+            </span>
+          </div>
+          <div style="width:72px;height:72px;background:rgba(255,255,255,0.2);
+                      border-radius:50%;display:inline-block;line-height:72px;
+                      margin-bottom:16px;border:2px solid rgba(255,255,255,0.4);
+                      font-size:36px;">
+            &#10004;
+          </div>
+          <h1 style="color:#ffffff;font-size:26px;font-weight:800;margin:0 0 8px;">
+            {titulo_principal}
+          </h1>
+          <p style="color:rgba(255,255,255,0.85);font-size:15px;margin:0;">
+            {subtitulo}
+          </p>
+        </td>
+      </tr>
+
+      <!-- BADGE DO PLANO -->
+      <tr>
+        <td style="padding:0 40px;">
+          <div style="background:{cor_clara};border:1px solid {cor}44;
+                      border-radius:12px;padding:20px 24px;margin-top:28px;text-align:center;">
+            <p style="margin:0 0 4px;font-size:12px;color:{cor};font-weight:700;
+                      text-transform:uppercase;letter-spacing:1.5px;">{badge_texto}</p>
+            <h2 style="margin:0 0 4px;font-size:28px;font-weight:800;color:{cor};">
+              {nome_plano} {f"• Anual (12 meses)" if is_anual else "• Mensal"}
+            </h2>
+            <p style="margin:0;font-size:13px;color:#6b7280;">{descricao}</p>
+          </div>
+        </td>
+      </tr>
+
+      <!-- COMPROVANTE -->
+      <tr>
+        <td style="padding:28px 40px 0;">
+          <h3 style="margin:0 0 16px;font-size:15px;font-weight:700;color:#111827;
+                     border-bottom:2px solid #f3f4f6;padding-bottom:10px;">
+            Comprovante de Pagamento
+          </h3>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size:13px;color:#6b7280;padding:10px 0;">Status</td>
+              <td style="text-align:right;padding:10px 0;">
+                <span style="background:#dcfce7;color:#16a34a;font-size:12px;
+                             font-weight:700;padding:4px 12px;border-radius:20px;
+                             border:1px solid #bbf7d0;">APROVADO</span>
+              </td>
+            </tr>
+            <tr><td colspan="2" style="border-bottom:1px solid #f3f4f6;"></td></tr>
+            <tr>
+              <td style="font-size:13px;color:#6b7280;padding:10px 0;">Plano Contratado</td>
+              <td style="text-align:right;font-size:13px;font-weight:600;
+                         color:#111827;padding:10px 0;">{nome_plano} ({ "Anual (12 meses)" if is_anual else "Mensal" })</td>
+            </tr>
+            <tr><td colspan="2" style="border-bottom:1px solid #f3f4f6;"></td></tr>
+            <tr>
+              <td style="font-size:13px;color:#6b7280;padding:10px 0;">Forma de Pagamento</td>
+              <td style="text-align:right;font-size:13px;font-weight:600;
+                         color:#111827;padding:10px 0;">{forma_pagto}</td>
+            </tr>
+            <tr><td colspan="2" style="border-bottom:1px solid #f3f4f6;"></td></tr>
+            <tr>
+              <td style="font-size:13px;color:#6b7280;padding:10px 0;">{rotulo_valor}</td>
+              <td style="text-align:right;padding:10px 0;">
+                <span style="font-size:22px;font-weight:800;color:{cor};">{valor_principal}</span>
+                <span style="font-size:11px;color:#9ca3af;">{sufixo_ciclo}</span>
+                {nota_economia}
+              </td>
+            </tr>
+            <tr><td colspan="2" style="border-bottom:1px solid #f3f4f6;"></td></tr>
+            <tr>
+              <td style="font-size:13px;color:#6b7280;padding:10px 0;">Ciclo de Cobrança</td>
+              <td style="text-align:right;font-size:13px;color:#111827;
+                         padding:10px 0;">{tipo_recorrencia}</td>
+            </tr>
+            <tr><td colspan="2" style="border-bottom:1px solid #f3f4f6;"></td></tr>
+            <tr>
+              <td style="font-size:13px;color:#6b7280;padding:10px 0;">Data da Aprovação</td>
+              <td style="text-align:right;font-size:13px;color:#111827;
+                         padding:10px 0;">{data_str}</td>
+            </tr>
+            <tr><td colspan="2" style="border-bottom:1px solid #f3f4f6;"></td></tr>
+            <tr>
+              <td style="font-size:13px;color:#6b7280;padding:10px 0;">ID do Comprovante</td>
+              <td style="text-align:right;font-size:11px;color:#6b7280;
+                         font-family:monospace;padding:10px 0;
+                         word-break:break-all;">{comprovante_id}</td>
+            </tr>
+            <tr><td colspan="2" style="border-bottom:1px solid #f3f4f6;"></td></tr>
+            <tr>
+              <td style="font-size:13px;color:#6b7280;padding:10px 0;">E-mail do Cliente</td>
+              <td style="text-align:right;font-size:13px;color:#111827;
+                         padding:10px 0;">{email_usuario}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- RECURSOS -->
+      <tr>
+        <td style="padding:24px 40px 0;">
+          <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;color:#111827;">
+            O que esta incluído no seu plano
+          </h3>
+          <ul style="margin:0;padding-left:0;list-style:none;">
+            {recursos_itens}
+          </ul>
+        </td>
+      </tr>
+
+      <!-- AVISO -->
+      <tr>
+        <td style="padding:0 40px 32px;">
+          <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;
+                      padding:16px 20px;">
+            <p style="margin:0;font-size:13px;color:#92400e;line-height:1.7;">
+              <strong>Informação importante:</strong> {aviso_rodape}
+            </p>
+          </div>
+        </td>
+      </tr>
+
+      <!-- RODAPE -->
+      <tr>
+        <td style="background:#f9fafb;border-top:1px solid #f3f4f6;
+                   padding:24px 40px;text-align:center;">
+          <p style="margin: 0 0 6px; font-size: 12px; color: #9ca3af;">EnterSight - Gestão e Inteligência para Empresas</p>
+    
+          <p style="margin:0;font-size:11px;color:#d1d5db;">
+            &copy; 2026 EnterSight. Todos os direitos reservados.
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>"""
+
+    return html
+
+
+# ==============================================================================
+# 6. FUNÇÃO PÚBLICA DE ENVIO
+# ==============================================================================
+
+def enviar_email_confirmacao_assinatura(
+    email_usuario: str,
+    nome_usuario: str,
+    plano: str,
+    subscription_id: str = "",
+    session_id: str = "",
+    is_renovacao: bool = False,
+    periodicidade: str = "mensal",
+    metodo: str = "card",
+) -> bool:
+    """
+    Envia o e-mail de confirmação ou renovação de assinatura para o cliente,
+    com suporte completo aos planos Mensal e Anual, e métodos Cartão ou Pix.
+
+    Parâmetros
+    ----------
+    email_usuario   : e-mail do assinante
+    nome_usuario    : nome do assinante (pode ser vazio)
+    plano           : código do plano — "MEI" ou "ME"
+    subscription_id : ID da assinatura no Stripe (sub_xxx) ou intent (pi_xxx)
+    session_id      : ID da sessão de checkout (cs_xxx) — fallback
+    is_renovacao    : indica se é renovação periódica da assinatura
+    periodicidade   : "mensal" ou "anual"
+    metodo          : "card" ou "pix"
+
+    Retorna True se enviado com sucesso, False caso contrário.
+    """
+    # --------------------------------------------------------------------------
+    # 6.1 Validação inicial
+    # --------------------------------------------------------------------------
+    if not email_usuario:
+        logger.warning("[email_assinatura] Nenhum e-mail fornecido. Envio cancelado.")
+        return False
+
+    try:
+        # ----------------------------------------------------------------------
+        # 6.2 Verificação da configuração do Flask-Mail
+        # ----------------------------------------------------------------------
+        mail = getattr(current_app, "mail", None)
+        if not mail:
+            logger.error("[email_assinatura] Flask-Mail nao configurado.")
+            return False
+
+        sender = (
+            current_app.config.get("MAIL_USERNAME")
+            or current_app.config.get("MAIL_DEFAULT_SENDER")
+        )
+        if not sender:
+            logger.error("[email_assinatura] MAIL_USERNAME nao configurado.")
+            return False
+
+        # ----------------------------------------------------------------------
+        # 6.3 Deduplicação (evita reenvio do mesmo webhook/sessão em curto período)
+        # ----------------------------------------------------------------------
+        # Para renovações, a chave é o ID da fatura (invoice_id) para não conflitar com a assinatura inicial.
+        if is_renovacao:
+            evento_chave = f"renovacao_{session_id}" if session_id else f"renovacao_{subscription_id}_{datetime.now().strftime('%Y_%m')}"
+        else:
+            evento_chave = session_id or subscription_id
+
+        if evento_chave:
+            try:
+                u_check = usuario.find_one({
+                    "$or": [
+                        {"email": email_usuario.lower()},
+                        (
+                            {"stripe_subscription_id": subscription_id}
+                            if subscription_id
+                            else {"email": email_usuario.lower()}
+                        ),
+                    ]
+                })
+                if u_check and evento_chave in u_check.get(
+                    "emails_confirmacao_enviados", []
+                ):
+                    logger.info(
+                        "[email_assinatura] E-mail já enviado para %s (chave=%s). "
+                        "Ignorando duplicata.",
+                        email_usuario,
+                        evento_chave,
+                    )
+                    return True
+            except Exception as ex_dedup:
+                logger.warning(
+                    "[email_assinatura] Aviso ao verificar duplicata: %s", ex_dedup
+                )
+
+        # ----------------------------------------------------------------------
+        # 6.4 Preparação do conteúdo
+        # ----------------------------------------------------------------------
+        data_pagamento = datetime.now()
+        is_anual = str(periodicidade).strip().lower() == "anual"
+        is_pix = str(metodo).strip().lower() == "pix"
+        info = _info_plano(plano)
+
+        html_body = _gerar_html_confirmacao(
+            nome_usuario=nome_usuario,
+            email_usuario=email_usuario,
+            plano=plano,
+            subscription_id=subscription_id,
+            session_id=session_id,
+            data_pagamento=data_pagamento,
+            is_renovacao=is_renovacao,
+            periodicidade=periodicidade,
+            metodo=metodo,
+        )
+
+        ciclo_nome = "Plano Anual" if is_anual else "Plano Mensal"
+        valor_str = info["valor_anual"] if is_anual else info["valor_mensal"]
+
+        if is_renovacao:
+            assunto = f"Renovação de {info['nome']} ({ciclo_nome}) confirmada - EnterSight"
+            texto_acao = "foi renovada com sucesso"
+        elif is_anual and is_pix:
+            assunto = f"Pagamento Pix {info['nome']} ({ciclo_nome}) confirmado - EnterSight"
+            texto_acao = "foi aprovado via Pix com 20% de desconto"
+        else:
+            assunto = f"Assinatura {info['nome']} ({ciclo_nome}) confirmada - EnterSight"
+            texto_acao = "foi confirmada com sucesso"
+
+        texto_plano = (
+            f"Olá {nome_usuario or 'Cliente'}!\n\n"
+            f"Sua assinatura do plano {info['nome']} ({ciclo_nome} - {valor_str}) "
+            f"{texto_acao} em "
+            f"{data_pagamento.strftime('%d/%m/%Y às %H:%M')}.\n\n"
+            f"Forma de Pagamento: {'PIX À Vista' if is_pix else 'Cartão (Crédito/Débito)'}\n"
+            f"ID do comprovante: {subscription_id or session_id or 'N/A'}\n\n"
+            "Acesse sua plataforma em: https://EnterSight.com.br/home\n\n"
+            "Equipe EnterSight"
+        )
+
+        # ----------------------------------------------------------------------
+        # 6.5 Envio
+        # ----------------------------------------------------------------------
+        msg = criar_mensagem(
+            subject=assunto,
+            recipients=[email_usuario],
+            body=texto_plano,
+            html=html_body,
+        )
+
+        enviar_email_async(msg)
+
+        # ----------------------------------------------------------------------
+        # 6.6 Registro para deduplicação futura
+        # ----------------------------------------------------------------------
+        if evento_chave:
+            try:
+                usuario.update_many(
+                    {"email": email_usuario.lower()},
+                    {"$addToSet": {"emails_confirmacao_enviados": evento_chave}},
+                )
+            except Exception as ex_reg:
+                logger.warning(
+                    "[email_assinatura] Aviso ao registrar envio: %s", ex_reg
+                )
+
+        logger.info(
+            "[email_assinatura] Confirmação enviada para %s (plano=%s, periodicidade=%s, metodo=%s).",
+            email_usuario,
+            plano,
+            periodicidade,
+            metodo,
+        )
+        return True
+
+    except Exception as exc:
+        logger.error(
+            "[email_assinatura] Erro ao enviar para %s: %s",
+            email_usuario,
+            exc,
+            exc_info=True,
+        )
+        return False
