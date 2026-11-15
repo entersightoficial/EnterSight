@@ -10,14 +10,12 @@
 # 1. IMPORTAÇÕES
 # ==============================================================================
 
-import os
 import re
 import secrets
 import traceback
 from datetime import datetime, timedelta
 
 import bcrypt
-import stripe
 from bson import ObjectId
 from flask import (
     render_template,
@@ -171,11 +169,6 @@ def tela_cadastro():
     # --------------------------------------------------------------------------
     # 4.1. Pré-condições e parâmetros iniciais
     # --------------------------------------------------------------------------
-    session_id = request.args.get("session_id") or request.form.get("session_id")
-
-    if not session_id:
-        return redirect(url_for("pagina_assinaturas"))
-
     email_preenchido = ""
     plano_contratado = (
         request.args.get("plano")
@@ -186,56 +179,8 @@ def tela_cadastro():
     if plano_contratado not in ["MEI", "ME"]:
         plano_contratado = "ME"
 
-    periodicidade_contratada = (
-        request.args.get("periodicidade")
-        or request.form.get("periodicidade")
-        or session.get("periodicidade_escolhida")
-        or "mensal"
-    ).strip().lower()
-    if periodicidade_contratada not in ["mensal", "anual"]:
-        periodicidade_contratada = "mensal"
-
-    metodo_pagamento = (
-        request.args.get("metodo")
-        or request.form.get("metodo")
-        or session.get("metodo_pagamento")
-        or "card"
-    ).strip().lower()
-    if metodo_pagamento not in ["card", "pix"]:
-        metodo_pagamento = "card"
-
-    customer_id = None
-    subscription_id = None
-    payment_intent_id = None
-
     # --------------------------------------------------------------------------
-    # 4.2. Validação da sessão do Stripe Checkout
-    # --------------------------------------------------------------------------
-    try:
-        STRIPE_SECRET_KEY = os.getenv("STRIPE_API_KEY")
-        if STRIPE_SECRET_KEY:
-            stripe.api_key = STRIPE_SECRET_KEY
-            checkout_session = stripe.checkout.Session.retrieve(session_id)
-            detalhes = checkout_session.get("customer_details") or {}
-            email_preenchido = (
-                detalhes.get("email")
-                or checkout_session.get("customer_email")
-                or ""
-            )
-            metadata = checkout_session.get("metadata") or {}
-            plano_contratado = (metadata.get("plano") or plano_contratado).strip().upper()
-            if plano_contratado not in ["MEI", "ME"]:
-                plano_contratado = "ME"
-            periodicidade_contratada = (metadata.get("periodicidade") or periodicidade_contratada).strip().lower()
-            metodo_pagamento = (metadata.get("metodo") or metodo_pagamento).strip().lower()
-            customer_id = checkout_session.get("customer")
-            subscription_id = checkout_session.get("subscription")
-            payment_intent_id = checkout_session.get("payment_intent")
-    except Exception as e:
-        print(f"Aviso ao consultar Stripe session_id ({session_id}): {e}")
-
-    # --------------------------------------------------------------------------
-    # 4.3. Submissão do formulário
+    # 4.2. Submissão do formulário
     # --------------------------------------------------------------------------
     if request.method == "POST":
         from backend.cnpj.cnpj_service import formatar_cnpj, calcular_teto_anual_mei
@@ -248,7 +193,7 @@ def tela_cadastro():
 
         # Dados do Perfil e CNPJ
         cnpj_input = request.form.get("cnpj", "").strip()
-        tipo_perfil = plano_contratado or request.form.get("tipo_perfil", "ME").strip().upper()
+        tipo_perfil = request.form.get("tipo_perfil", "ME").strip().upper()
         if tipo_perfil not in ["MEI", "ME"]:
             tipo_perfil = "ME"
         razao_social = request.form.get("razao_social", "").strip()
@@ -260,11 +205,8 @@ def tela_cadastro():
                 "cadastro.html",
                 error_cad=True,
                 msg="Todos os campos obrigatórios devem ser preenchidos.",
-                session_id=session_id,
                 email_preenchido=email_preenchido,
                 plano_contratado=plano_contratado,
-                periodicidade_contratada=periodicidade_contratada,
-                metodo_pagamento=metodo_pagamento,
             )
 
         if not validar_email(email):
@@ -272,11 +214,8 @@ def tela_cadastro():
                 "cadastro.html",
                 error_cad=True,
                 msg="Email inválido.",
-                session_id=session_id,
                 email_preenchido=email_preenchido,
                 plano_contratado=plano_contratado,
-                periodicidade_contratada=periodicidade_contratada,
-                metodo_pagamento=metodo_pagamento,
             )
 
         # Telefone (opcional ou validado se preenchido)
@@ -288,11 +227,8 @@ def tela_cadastro():
                     "cadastro.html",
                     error_cad=True,
                     msg=tel_res,
-                    session_id=session_id,
                     email_preenchido=email_preenchido,
                     plano_contratado=plano_contratado,
-                    periodicidade_contratada=periodicidade_contratada,
-                    metodo_pagamento=metodo_pagamento,
                 )
 
         valido, msg = validar_senha(senha)
@@ -301,11 +237,8 @@ def tela_cadastro():
                 "cadastro.html",
                 error_cad=True,
                 msg=msg,
-                session_id=session_id,
                 email_preenchido=email_preenchido,
                 plano_contratado=plano_contratado,
-                periodicidade_contratada=periodicidade_contratada,
-                metodo_pagamento=metodo_pagamento,
             )
 
         if senha != confirmar:
@@ -313,11 +246,8 @@ def tela_cadastro():
                 "cadastro.html",
                 error_cad=True,
                 msg="As senhas não coincidem.",
-                session_id=session_id,
                 email_preenchido=email_preenchido,
                 plano_contratado=plano_contratado,
-                periodicidade_contratada=periodicidade_contratada,
-                metodo_pagamento=metodo_pagamento,
             )
 
         if usuario.find_one({"email": email}):
@@ -325,11 +255,8 @@ def tela_cadastro():
                 "cadastro.html",
                 error_cad=True,
                 msg="Email já cadastrado. Acesse a tela de login.",
-                session_id=session_id,
                 email_preenchido=email_preenchido,
                 plano_contratado=plano_contratado,
-                periodicidade_contratada=periodicidade_contratada,
-                metodo_pagamento=metodo_pagamento,
             )
 
         # Tratamento do CNPJ
@@ -355,12 +282,6 @@ def tela_cadastro():
             "cnpj": cnpj_limpo,
             "cnpj_formatado": cnpj_formatado,
             "tipo_perfil": tipo_perfil,
-            "status_assinatura": "ativa",
-            "periodicidade_escolhida": periodicidade_contratada,
-            "metodo_pagamento": metodo_pagamento,
-            "stripe_customer_id": customer_id,
-            "stripe_subscription_id": subscription_id,
-            "stripe_payment_intent_id": payment_intent_id,
             "razao_social": razao_social or nome,
             "data_abertura": data_abertura,
             "limite_anual_mei": limite_anual_mei,
@@ -380,44 +301,20 @@ def tela_cadastro():
         session["usuario_telefone"] = telefone
         session["usuario_perfil"] = tipo_perfil
         session["plano_escolhido"] = tipo_perfil
-        session["periodicidade_escolhida"] = periodicidade_contratada
-        session["metodo_pagamento"] = metodo_pagamento
-        session["status_assinatura"] = "ativa"
         session["usuario_cnpj"] = cnpj_formatado
         session["usuario_razao_social"] = razao_social or nome
         session["data_abertura_mei"] = data_abertura
         session["limite_anual_mei"] = limite_anual_mei
 
-        # ----------------------------------------------------------------------
-        # 4.6. E-mail de confirmação de assinatura
-        # ----------------------------------------------------------------------
-        if session_id:
-            try:
-                from backend.pagamento.email_assinatura import enviar_email_confirmacao_assinatura
-                enviar_email_confirmacao_assinatura(
-                    email_usuario=email,
-                    nome_usuario=nome,
-                    plano=tipo_perfil,
-                    subscription_id=subscription_id or payment_intent_id or "",
-                    session_id=session_id or "",
-                    periodicidade=periodicidade_contratada,
-                    metodo=metodo_pagamento,
-                )
-            except Exception as ex_mail:
-                print(f"[tela_cadastro] Aviso ao enviar e-mail de confirmação: {ex_mail}")
-
-        return redirect(url_for("pagina_home"))
+        return redirect(url_for("index"))
 
     # --------------------------------------------------------------------------
     # 4.7. GET — renderiza o formulário
     # --------------------------------------------------------------------------
     return render_template(
         "cadastro.html",
-        session_id=session_id,
         email_preenchido=email_preenchido,
         plano_contratado=plano_contratado,
-        periodicidade_contratada=periodicidade_contratada,
-        metodo_pagamento=metodo_pagamento,
     )
 
 
@@ -445,7 +342,6 @@ def login():
             session["usuario_email"] = user["email"]
             session["usuario_telefone"] = user.get("telefone_formatado") or user.get("telefone") or ""
             session["usuario_perfil"] = user.get("tipo_perfil", "ME")
-            session["status_assinatura"] = user.get("status_assinatura", "pendente")
             session["usuario_cnpj"] = user.get("cnpj_formatado") or user.get("cnpj") or ""
             session["usuario_razao_social"] = user.get("razao_social", "")
             session["data_abertura_mei"] = user.get("data_abertura", "")
@@ -457,12 +353,6 @@ def login():
                 session.permanent = True
             else:
                 session.permanent = False
-
-            # Verificação de status da assinatura (Admins ou contas ativas são liberadas)
-            if not user.get("is_admin") and user.get("email") != "admin@EnterSight.com":
-                status = user.get("status_assinatura", "pendente")
-                if status != "ativa":
-                    return redirect(url_for("pagina_bloqueio_assinatura", motivo=status))
 
             return redirect(url_for("pagina_home"))
 
@@ -499,6 +389,7 @@ def alternar_perfil():
             }
         )
         session["usuario_perfil"] = novo_perfil
+        session["plano_escolhido"] = novo_perfil
         return jsonify({
             "sucesso": True,
             "tipo_perfil": novo_perfil,
