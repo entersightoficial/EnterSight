@@ -195,12 +195,9 @@
               </div>
             </div>
             <div class="pf-hero-actions perfil-acoes">
-              <a href="{{ url_for('pagina_assinaturas') }}" class="botao botao--primario" id="btnAlternarPlano">
+              <button type="button" class="botao botao--primario" id="btnAlternarPlano" onclick="alternarPlanoUsuario()">
                 <i class="fa-solid fa-arrows-rotate"></i>
-                Mudar de Plano
-              </a>
-              <button type="button" class="botao botao--outline" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" id="btnAbrirModalCancelarAssinatura">
-                <i class="fa-solid fa-ban"></i> Cancelar Assinatura
+                Alternar perfil MEI/ME
               </button>
               <a href="{{ url_for('logout') }}" class="botao botao--suave">
                 <i class="fa-solid fa-right-from-bracket"></i> Trocar conta
@@ -277,25 +274,6 @@
     </div>
   </div>
 
-  <!-- Modal Confirmar Cancelamento de Assinatura -->
-  <div id="modalCancelarAssinatura" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center;">
-    <div class="modal-card" style="background: var(--bg-card, #1e293b); color: white; padding: 24px; border-radius: 12px; max-width: 480px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);">
-      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-        <i class="fa-solid fa-triangle-exclamation" style="color: #ef4444; font-size: 1.5rem;"></i>
-        <h3 style="margin: 0; font-size: 1.25rem;">Cancelar Assinatura?</h3>
-      </div>
-      <p style="color: var(--texto-secundario, #94a3b8); font-size: 0.95rem; line-height: 1.5; margin-bottom: 20px;">
-        Tem certeza que deseja cancelar sua assinatura do EnterSight? Ao confirmar, as cobranças recorrentes serão interrompidas no Stripe e seu acesso ao painel será suspenso.
-      </p>
-      <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button type="button" class="botao botao--suave" id="btnFecharModalCancelar">Voltar</button>
-        <button type="button" class="botao" style="background: #ef4444; color: #fff; font-weight: 600;" id="btnConfirmarCancelarAssinatura">
-          <i class="fa-solid fa-ban"></i> Confirmar Cancelamento
-        </button>
-      </div>
-    </div>
-  </div>
-
   {% include 'partials/navbar_mobile.html' %}
   {% include 'partials/painel_acessibilidade.html' %}
 
@@ -308,8 +286,14 @@
     function abrirSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebarOverlay').classList.add('active');}
     function fecharSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('active');}
 
-    function alternarPlanoUsuario() {
-      window.location.href = "{{ url_for('pagina_assinaturas') }}";
+    async function alternarPlanoUsuario() {
+      const tipoPerfil = {{ usuario_perfil|tojson }} === 'MEI' ? 'ME' : 'MEI';
+      const resposta = await fetch("{{ url_for('rota_alternar_perfil') }}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo_perfil: tipoPerfil })
+      });
+      if (resposta.ok) window.location.reload();
     }
   </script>
 </body>
