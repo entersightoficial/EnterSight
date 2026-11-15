@@ -178,66 +178,11 @@
   }
 
   // ============================================================================
-  // 5. MODAL DE CANCELAMENTO DE ASSINATURA
-  // ============================================================================
-
-  function configurarModalCancelarAssinatura() {
-    const btnAbrir = document.getElementById('btnAbrirModalCancelarAssinatura');
-    const modal = document.getElementById('modalCancelarAssinatura');
-    const btnFechar = document.getElementById('btnFecharModalCancelar');
-    const btnConfirmar = document.getElementById('btnConfirmarCancelarAssinatura');
-
-    if (!btnAbrir || !modal) return;
-
-    btnAbrir.addEventListener('click', () => {
-      modal.style.display = 'flex';
-    });
-
-    if (btnFechar) {
-      btnFechar.addEventListener('click', () => {
-        modal.style.display = 'none';
-      });
-    }
-
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.style.display = 'none';
-    });
-
-    if (btnConfirmar) {
-      btnConfirmar.addEventListener('click', async () => {
-        btnConfirmar.disabled = true;
-        btnConfirmar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cancelando...';
-
-        try {
-          const resp = await fetch('/cancelar-assinatura', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          const resData = await resp.json();
-
-          if (resp.ok && resData.sucesso) {
-            window.location.href = '/bloqueio-assinatura?motivo=cancelada';
-          } else {
-            alert(resData.erro || 'Falha ao cancelar assinatura.');
-            btnConfirmar.disabled = false;
-            btnConfirmar.innerHTML = '<i class="fa-solid fa-ban"></i> Confirmar Cancelamento';
-          }
-        } catch (err) {
-          alert('Erro na requisição. Tente novamente.');
-          btnConfirmar.disabled = false;
-          btnConfirmar.innerHTML = '<i class="fa-solid fa-ban"></i> Confirmar Cancelamento';
-        }
-      });
-    }
-  }
-
-  // ============================================================================
-  // 6. INICIALIZAÇÃO
+  // 5. INICIALIZAÇÃO
   // ============================================================================
 
   document.addEventListener('DOMContentLoaded', () => {
     animarBarra();
     carregarNegocio();
-    configurarModalCancelarAssinatura();
   });
 })();
