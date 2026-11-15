@@ -14,7 +14,6 @@ import os
 import sys
 from datetime import timedelta
 
-from bson import ObjectId
 from dotenv import load_dotenv
 from flask import Flask, session, request, render_template, redirect, url_for
 from flask_mail import Mail
@@ -135,107 +134,23 @@ from backend.routes.auth_routes import auth_bp
 from backend.routes.dados_routes import dados_bp
 from backend.routes.analises_routes import analises_bp
 from backend.routes.ia_routes import ia_bp
-from backend.routes.pagamentos_routes import pagamentos_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(dados_bp)
 app.register_blueprint(analises_bp)
 app.register_blueprint(ia_bp)
-app.register_blueprint(pagamentos_bp)
 
 
 # ==============================================================================
-# 9. ROTA INDEX / RAIZ — Verificação de sessão e assinatura
+# 9. ROTA INDEX / RAIZ — Redirecionamento por autenticação
 # ==============================================================================
 
 @app.route("/", endpoint="index")
 @app.route("/inicio", endpoint="pagina_landing")   # alias: url_for('pagina_landing') continua funcionando nos templates
 def index():
-    """
-    Rota raiz da aplicação.
-
-    SEMPRE renderiza index.html (animação de entrada).
-    O `destino` passado ao template determina para onde a
-    animação redireciona automaticamente após 15 s (ou Enter):
-      → '/home'    se o usuário está logado com assinatura ativa
-      → '/landing' em todos os outros casos
-    """
-    # ------------------------------------------------------------------
-    # 9.1. Sem sessão → destino landing
-    # ------------------------------------------------------------------
-    if "usuario_id" not in session and "usuario_nome" not in session:
-        return render_template("index.html", destino="/landing")
-
-    # ------------------------------------------------------------------
-    # 9.2. Carrega o usuário do banco
-    # ------------------------------------------------------------------
-    from backend.db import usuario as usuario_col
-    from datetime import datetime as _dt
-
-    user_id   = session.get("usuario_id")
-    user_email = session.get("usuario_email")
-    user = None
-
-    try:
-        if user_id:
-            try:
-                user = usuario_col.find_one({"_id": ObjectId(str(user_id))})
-            except Exception:
-                if user_email:
-                    user = usuario_col.find_one({"email": user_email.lower()})
-        elif user_email:
-            user = usuario_col.find_one({"email": user_email.lower()})
-    except Exception as err_db:
-        print(f"[index] Erro ao consultar banco: {err_db}")
-
-    # ------------------------------------------------------------------
-    # 9.3. Sem doc no banco → destino landing
-    # ------------------------------------------------------------------
-    if not user:
-        return render_template("index.html", destino="/landing")
-
-    # ------------------------------------------------------------------
-    # 9.4. Admins: destino home
-    # ------------------------------------------------------------------
-    if user.get("is_admin") or user.get("email") == "admin@EnterSight.com":
-        if user.get("tipo_perfil"):
-            session["usuario_perfil"] = user["tipo_perfil"]
-        session.modified = True
-        return render_template("index.html", destino="/home")
-
-    # ------------------------------------------------------------------
-    # 9.5. Verifica assinatura
-    # ------------------------------------------------------------------
-    status_banco = user.get("status_assinatura", "pendente")
-    status_sessao = session.get("status_assinatura", "")
-
-    if status_banco == "ativa":
-        # Assinatura confirmada no banco → destino home
-        if user.get("tipo_perfil"):
-            session["usuario_perfil"] = user["tipo_perfil"]
-        session["status_assinatura"] = "ativa"
-        session.modified = True
-        return render_template("index.html", destino="/home")
-
-    if status_sessao == "ativa":
-        # Sessão diz ativa, banco diverge → sincroniza banco e libera
-        try:
-            usuario_col.update_one(
-                {"_id": user["_id"]},
-                {"$set": {"status_assinatura": "ativa", "atualizado_em": _dt.now()}}
-            )
-            print(f"[index] Sincronizado status->ativa para {user.get('email')} via sessão.")
-        except Exception as ex:
-            print(f"[index] Falha ao sincronizar banco: {ex}")
-        if user.get("tipo_perfil"):
-            session["usuario_perfil"] = user["tipo_perfil"]
-        session.modified = True
-        return render_template("index.html", destino="/home")
-
-    # ------------------------------------------------------------------
-    # 9.6. Assinatura pendente/cancelada → landing
-    # ------------------------------------------------------------------
-    return render_template("index.html", destino="/landing")
+    if "usuario_id" in session or "usuario_nome" in session:
+        return redirect(url_for("pagina_home"))
+    return redirect(url_for("landing"))
 
 
 # ==============================================================================
@@ -302,4 +217,4 @@ _registrar_aliases_blueprints(app)
 # ==============================================================================
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=False)
