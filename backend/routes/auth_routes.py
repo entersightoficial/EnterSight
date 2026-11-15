@@ -10,7 +10,6 @@
 # 1. IMPORTAÇÕES
 # ==============================================================================
 
-from datetime import datetime
 from functools import wraps
 
 from bson import ObjectId
@@ -36,21 +35,17 @@ auth_bp = Blueprint("auth", __name__)
 
 
 # ==============================================================================
-# 3. PROTEÇÃO & PAYWALL SAAS
+# 3. PROTEÇÃO DE AUTENTICAÇÃO
 # ==============================================================================
 
 def login_required(f):
     """
-    Decorator de autenticação + verificação de assinatura.
+    Garante que a sessão pertence a um usuário cadastrado.
 
     Fluxo:
       1. Sem usuário na sessão → redireciona para o login.
       2. Carrega o documento do usuário (por _id, com fallback por e-mail).
-      3. Sincroniza `usuario_perfil` na sessão com base em `plano_escolhido`
-         ou `tipo_perfil`.
-      4. Admins (flag ou e-mail) passam sem checagem de assinatura.
-      5. Assinatura diferente de "ativa" → bloqueio; exceto se a sessão
-         indicar "ativa", caso em que sincroniza o banco e libera.
+        3. Sincroniza `usuario_perfil` na sessão com o perfil selecionado.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -92,24 +87,6 @@ def login_required(f):
             elif user.get("tipo_perfil"):
                 session["usuario_perfil"] = user.get("tipo_perfil")
 
-            # Admins liberados sem restrição
-            if user.get("is_admin") or user.get("email") == "admin@EnterSight.com":
-                return f(*args, **kwargs)
-
-            status = user.get("status_assinatura", "pendente")
-            if status != "ativa":
-                if session.get("status_assinatura") == "ativa":
-                    try:
-                        usuario.update_one(
-                            {"_id": user["_id"]},
-                            {"$set": {"status_assinatura": "ativa", "atualizado_em": datetime.now()}}
-                        )
-                        print(f"[login_required] Sincronizado status->ativa para user {user.get('email')} via sessão.")
-                        return f(*args, **kwargs)
-                    except Exception as ex:
-                        print(f"[login_required] Falha ao sincronizar BD: {ex}")
-
-                return redirect(url_for("pagina_bloqueio_assinatura", motivo=status))
         else:
             return redirect(url_for("pagina_login"))
 
