@@ -142,15 +142,14 @@ app.register_blueprint(ia_bp)
 
 
 # ==============================================================================
-# 9. ROTA INDEX / RAIZ — Redirecionamento por autenticação
+# 9. ROTA INDEX / RAIZ
 # ==============================================================================
 
 @app.route("/", endpoint="index")
 @app.route("/inicio", endpoint="pagina_landing")   # alias: url_for('pagina_landing') continua funcionando nos templates
 def index():
-    if "usuario_id" in session or "usuario_nome" in session:
-        return redirect(url_for("pagina_home"))
-    return redirect(url_for("landing"))
+    destino = url_for("pagina_home") if "usuario_id" in session or "usuario_nome" in session else url_for("landing")
+    return render_template("index.html", destino=destino)
 
 
 # ==============================================================================
@@ -217,4 +216,4 @@ _registrar_aliases_blueprints(app)
 # ==============================================================================
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    app.run(debug=True, host="0.0.0.0", port=5000)
