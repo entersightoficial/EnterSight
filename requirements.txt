@@ -21,3 +21,4 @@ scipy
 reportlab
 python-docx
 beautifulsoup4
+stripe
